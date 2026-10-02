@@ -1,0 +1,2305 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>古田土会計チャレンジプログラム 得点集計システム</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Canvas Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              100: '#dbeafe',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+              800: '#1e40af',
+              900: '#1e3a8a',
+            },
+            cblue: { light: '#e0f2fe', badge: '#0284c7', border: '#7dd3fc', text: '#0369a1' },
+            cyellow: { light: '#fef9c3', badge: '#ca8a04', border: '#fde047', text: '#854d0e' },
+            cred: { light: '#fee2e2', badge: '#dc2626', border: '#fca5a5', text: '#991b1b' },
+            cfinal: { light: '#ede9fe', badge: '#7c3aed', border: '#c4b5fd', text: '#5b21b6' },
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Teko:wght@600;700&display=swap');
+    
+    body {
+      font-family: 'Noto Sans JP', sans-serif;
+    }
+    .score-font {
+      font-family: 'Teko', sans-serif;
+      letter-spacing: 0.05em;
+    }
+    
+    /* 印刷スタイル */
+    @media print {
+      body {
+        background: white !important;
+        color: black !important;
+        font-size: 11pt;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .print-only {
+        display: block !important;
+      }
+      .page-break {
+        page-break-after: always;
+        break-after: page;
+      }
+      @page {
+        size: A4 landscape;
+        margin: 8mm;
+      }
+      .print-portrait {
+        page-break-before: always;
+      }
+      @page portrait-page {
+        size: A4 portrait;
+        margin: 10mm;
+      }
+    }
+    @media screen {
+      .print-only {
+        display: none !important;
+      }
+    }
+
+    /* アニメーション */
+    @keyframes pulse-subtle {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.92; transform: scale(1.02); }
+    }
+    .animate-pulse-subtle {
+      animation: pulse-subtle 2s infinite ease-in-out;
+    }
+    
+    /* ランク別バッジ装飾 */
+    .rank-1-gold {
+      background: linear-gradient(135deg, #fef08a 0%, #eab308 50%, #ca8a04 100%);
+      color: #713f12;
+      text-shadow: 0 1px 2px rgba(255,255,255,0.6);
+    }
+    .rank-2-silver {
+      background: linear-gradient(135deg, #f1f5f9 0%, #cbd5e1 50%, #94a3b8 100%);
+      color: #334155;
+    }
+    .rank-3-bronze {
+      background: linear-gradient(135deg, #ffedd5 0%, #fdba74 50%, #c2410c 100%);
+      color: #7c2d12;
+    }
+
+    /* スクロールバー装飾 */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen antialiased flex flex-col">
+
+  <!-- ==================== ナビゲーションバー (画面表示時のみ) ==================== -->
+  <header class="no-print bg-slate-900 text-white shadow-lg sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <!-- ロゴ＆タイトル -->
+        <div class="flex items-center space-x-3 cursor-pointer" onclick="switchTab('input')">
+          <div class="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center text-white shadow-md font-bold text-xl">
+            <i class="fa-solid fa-trophy"></i>
+          </div>
+          <div>
+            <h1 class="text-lg font-bold leading-tight tracking-wide flex items-center gap-2">
+              古田土会計チャレンジプログラム
+              <span class="text-xs bg-blue-500/30 text-blue-300 border border-blue-400/40 px-2 py-0.5 rounded-full font-normal">集計システム</span>
+            </h1>
+            <p class="text-xs text-slate-400">リアルタイム得点集計・プロジェクター投影・A4印刷</p>
+          </div>
+        </div>
+
+        <!-- ナビゲーションタブ -->
+        <nav class="flex items-center space-x-1 sm:space-x-2">
+          <button id="nav-btn-input" onclick="switchTab('input')" class="nav-tab px-3.5 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 bg-blue-600 text-white shadow">
+            <i class="fa-solid fa-pen-to-square"></i>
+            <span class="hidden sm:inline">得点入力</span>
+          </button>
+          <button id="nav-btn-ranking" onclick="switchTab('ranking')" class="nav-tab px-3.5 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-2">
+            <i class="fa-solid fa-ranking-star"></i>
+            <span class="hidden sm:inline">順位表</span>
+          </button>
+          <button id="nav-btn-projector" onclick="switchTab('projector')" class="nav-tab px-3.5 py-2 rounded-lg text-sm font-medium text-amber-300 hover:text-amber-200 hover:bg-amber-950/40 border border-amber-500/30 transition flex items-center gap-2">
+            <i class="fa-solid fa-display"></i>
+            <span class="hidden sm:inline">プロジェクター投影</span>
+          </button>
+          <button id="nav-btn-print" onclick="switchTab('print')" class="nav-tab px-3.5 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-2">
+            <i class="fa-solid fa-print"></i>
+            <span class="hidden sm:inline">印刷プレビュー</span>
+          </button>
+          <button id="nav-btn-settings" onclick="switchTab('settings')" class="nav-tab px-3.5 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-2">
+            <i class="fa-solid fa-sliders"></i>
+            <span class="hidden sm:inline">設定・管理</span>
+          </button>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <!-- ==================== サマリーステータスバー (画面上部) ==================== -->
+  <div id="sub-statusbar" class="no-print bg-white border-b border-slate-200 shadow-sm px-4 py-2.5">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3 text-xs sm:text-sm text-slate-600">
+      <div class="flex items-center gap-4 flex-wrap">
+        <span class="font-bold text-slate-800 flex items-center gap-1.5">
+          <i class="fa-solid fa-users text-blue-600"></i>
+          参加チーム: <span id="bar-team-count" class="text-blue-700 font-extrabold text-base">9</span> チーム
+        </span>
+        <span class="hidden md:inline text-slate-300">|</span>
+        <span class="flex items-center gap-1">
+          <span class="w-2.5 h-2.5 rounded-full bg-sky-400"></span> 水色: No.1〜3
+        </span>
+        <span class="flex items-center gap-1">
+          <span class="w-2.5 h-2.5 rounded-full bg-yellow-400"></span> 黄色: No.4〜6
+        </span>
+        <span class="flex items-center gap-1">
+          <span class="w-2.5 h-2.5 rounded-full bg-rose-400"></span> 赤色: No.7〜8
+        </span>
+        <span class="hidden lg:inline text-xs text-slate-500 italic bg-slate-100 px-2 py-0.5 rounded">
+          ※各色1つ以上チャレンジ必須
+        </span>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <span id="save-status" class="text-emerald-600 text-xs flex items-center gap-1 font-medium">
+          <i class="fa-solid fa-check"></i> 自動保存中
+        </span>
+        <button onclick="quickFillSampleData()" class="px-2 py-1 text-xs bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded text-slate-700 transition" title="テスト用のサンプル得点を入力">
+          <i class="fa-solid fa-wand-magic-sparkles mr-1"></i>サンプル入力
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== メインコンテンツ ==================== -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 no-print">
+
+    <!-- ========== TAB 1: 得点入力・管理 ========== -->
+    <section id="tab-input" class="space-y-6">
+      <!-- ヘッダーアクション -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+        <div>
+          <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+            <i class="fa-solid fa-pen-nib text-blue-600"></i>
+            各チーム得点入力フォーム
+          </h2>
+          <p class="text-sm text-slate-500 mt-0.5">
+            チームを選択して種目別の得点と最終チャレンジの順位を入力してください。入力内容は即座に保存されます。
+          </p>
+        </div>
+        <!-- チーム選択ピル -->
+        <div class="flex items-center gap-2">
+          <label for="team-selector" class="text-sm font-medium text-slate-700 whitespace-nowrap">選択チーム:</label>
+          <select id="team-selector" onchange="selectTeam(this.value)" class="bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 font-bold">
+            <!-- JSで動的生成 -->
+          </select>
+        </div>
+      </div>
+
+      <!-- チーム一覧カードクイック切り替えボタン -->
+      <div id="team-tab-list" class="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin">
+        <!-- JSでチーム切り替えバッジを生成 -->
+      </div>
+
+      <!-- 選択中チームの詳細入力カード -->
+      <div id="team-detail-card" class="bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden">
+        <!-- カードトップ：チーム名 ＆ 総合得点サマリー -->
+        <div class="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white p-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div class="flex items-center gap-4">
+            <div id="current-team-rank-badge" class="w-14 h-14 rounded-2xl bg-blue-600 flex flex-col items-center justify-center font-extrabold shadow-inner">
+              <span class="text-xs uppercase tracking-wider text-blue-200">Rank</span>
+              <span class="text-2xl score-font leading-none" id="current-team-rank">-</span>
+            </div>
+            <div>
+              <div class="flex items-center gap-3">
+                <input type="text" id="current-team-name-input" onchange="updateCurrentTeamName(this.value)" 
+                  class="bg-white/10 hover:bg-white/20 focus:bg-white focus:text-slate-900 text-white text-2xl font-bold px-3 py-1 rounded-lg border border-white/20 transition w-60 sm:w-80" 
+                  title="クリックしてチーム名を編集できます">
+                <span class="text-xs text-blue-200 bg-blue-500/30 px-2 py-1 rounded border border-blue-400/30">
+                  <i class="fa-solid fa-pencil mr-1"></i>名前変更可
+                </span>
+              </div>
+              <!-- カラー達成バッジ -->
+              <div class="flex items-center gap-2 mt-2 flex-wrap" id="current-team-color-badges">
+                <!-- JSで動的生成 -->
+              </div>
+            </div>
+          </div>
+
+          <!-- スコア集計表示 -->
+          <div class="flex items-center gap-6 bg-white/5 border border-white/10 rounded-xl p-4 self-start md:self-auto">
+            <div class="text-right">
+              <span class="text-xs text-slate-300 block">種目得点 (最大240)</span>
+              <span id="current-team-challenge-score" class="text-2xl font-bold score-font text-blue-300">0</span>
+              <span class="text-xs text-slate-400">点</span>
+            </div>
+            <div class="text-slate-500 text-2xl font-light">+</div>
+            <div class="text-right">
+              <span class="text-xs text-slate-300 block">最終チャレンジ (最大60)</span>
+              <span id="current-team-final-score" class="text-2xl font-bold score-font text-amber-300">0</span>
+              <span class="text-xs text-slate-400">点</span>
+            </div>
+            <div class="text-slate-500 text-2xl font-light">=</div>
+            <div class="text-right pl-2 border-l border-white/20">
+              <span class="text-xs text-yellow-300 font-bold block uppercase tracking-wider">合計得点</span>
+              <span id="current-team-total-score" class="text-4xl font-extrabold score-font text-yellow-400">0</span>
+              <span class="text-xs text-yellow-300">点</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ルールリマインダー -->
+        <div class="bg-amber-50 border-y border-amber-200 px-6 py-2.5 flex items-center justify-between text-xs text-amber-900">
+          <div class="flex items-center gap-2">
+            <i class="fa-solid fa-triangle-exclamation text-amber-600 text-sm"></i>
+            <span class="font-bold">ルール確認：</span>
+            <span>１４時４０分までチャレンジタイム！ <strong>それぞれ色のチャレンジ種目を必ず１つ以上チャレンジ</strong>してください。</span>
+          </div>
+          <span class="hidden sm:inline text-amber-700">各種目 最大30点</span>
+        </div>
+
+        <!-- 入力フォームグリッド -->
+        <div class="p-6 space-y-8">
+          
+          <!-- 水色グループ -->
+          <div>
+            <div class="flex items-center gap-2 mb-4 pb-2 border-b-2 border-sky-300">
+              <span class="w-3.5 h-3.5 rounded-full bg-sky-500"></span>
+              <h3 class="font-bold text-lg text-slate-800">水色グループ種目 (No.1 〜 3)</h3>
+              <span id="badge-group-blue" class="ml-auto text-xs px-2.5 py-1 rounded-full font-bold"></span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <!-- No.1 じゃんけん -->
+              <div class="border border-sky-200 bg-sky-50/50 rounded-xl p-4 flex flex-col justify-between hover:shadow-sm transition">
+                <div>
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="text-xs font-bold bg-sky-500 text-white px-2 py-0.5 rounded">No. 1</span>
+                    <span class="text-xs text-slate-500 font-semibold">最大 30点</span>
+                  </div>
+                  <h4 class="font-bold text-slate-800 text-base">じゃんけんチャレンジ</h4>
+                  <p class="text-xs text-slate-600 mt-1 leading-relaxed">
+                    スタッフと順番にじゃんけん！スタッフ1人につき1回（何人でも可）<br>
+                    <span class="text-sky-700 font-semibold">＜最高連続勝利数 × 3点＞</span>
+                  </p>
+                </div>
+
+                <div class="mt-4 pt-3 border-t border-sky-200/80 space-y-2">
+                  <div class="flex items-center justify-between">
+                    <label class="text-xs text-slate-600">最高連勝数:</label>
+                    <div class="flex items-center gap-1">
+                      <select id="input-item-1-wins" onchange="calcWinsScore(1, this.value)" class="text-xs border border-sky-300 rounded p-1 bg-white">
+                        <option value="">- 手動入力 -</option>
+                        <option value="1">1連勝 (3点)</option>
+                        <option value="2">2連勝 (6点)</option>
+                        <option value="3">3連勝 (9点)</option>
+                        <option value="4">4連勝 (12点)</option>
+                        <option value="5">5連勝 (15点)</option>
+                        <option value="6">6連勝 (18点)</option>
+                        <option value="7">7連勝 (21点)</option>
+                        <option value="8">8連勝 (24点)</option>
+                        <option value="9">9連勝 (27点)</option>
+                        <option value="10">10連勝 (30点)</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <label class="text-sm font-bold text-slate-700">得点:</label>
+                    <div class="flex items-center gap-1">
+                      <input type="number" id="input-score-1" min="0" max="30" onchange="updateScore(1, this.value)" 
+                        class="w-20 text-right font-extrabold score-font text-2xl text-sky-900 border-2 border-sky-300 rounded-lg p-1.5 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 bg-white" placeholder="0">
+                      <span class="text-sm font-bold text-slate-500">点</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- No.2 割り箸切り -->
+              <div class="border border-sky-200 bg-sky-50/50 rounded-xl p-4 flex flex-col justify-between hover:shadow-sm transition">
+                <div>
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="text-xs font-bold bg-sky-500 text-white px-2 py-0.5 rounded">No. 2</span>
+                    <span class="text-xs text-slate-500 font-semibold">約10分 / 最大 30点</span>
+                  </div>
+                  <h4 class="font-bold text-slate-800 text-base">割り箸切りチャレンジ</h4>
+                  <p class="text-xs text-slate-600 mt-1 leading-relaxed">
+                    カードで割り箸切り！<br>
+                    <span class="text-sky-700 font-semibold">＜成功本数 × 3点＞</span>
+                  </p>
+                </div>
+
+                <div class="mt-4 pt-3 border-t border-sky-200/80 space-y-2">
+                  <div class="flex items-center justify-between">
+                    <label class="text-xs text-slate-600">成功本数:</label>
+                    <div class="flex items-center gap-1">
+                      <select id="input-item-2-wins" onchange="calcWinsScore(2, this.value)" class="text-xs border border-sky-300 rounded p-1 bg-white">
+                        <option value="">- 手動入力 -</option>
+                        <option value="1">1本 (3点)</option>
+                        <option value="2">2本 (6点)</option>
+                        <option value="3">3本 (9点)</option>
+                        <option value="4">4本 (12点)</option>
+                        <option value="5">5本 (15点)</option>
+                        <option value="6">6本 (18点)</option>
+                        <option value="7">7本 (21点)</option>
+                        <option value="8">8本 (24点)</option>
+                        <option value="9">9本 (27点)</option>
+                        <option value="10">10本 (30点)</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <label class="text-sm font-bold text-slate-700">得点:</label>
+                    <div class="flex items-center gap-1">
+                      <input type="number" id="input-score-2" min="0" max="30" onchange="updateScore(2, this.value)" 
+                        class="w-20 text-right font-extrabold score-font text-2xl text-sky-900 border-2 border-sky-300 rounded-lg p-1.5 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 bg-white" placeholder="0">
+                      <span class="text-sm font-bold text-slate-500">点</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- No.3 ピクチャーコミュニケーション -->
+              <div class="border border-sky-200 bg-sky-50/50 rounded-xl p-4 flex flex-col justify-between hover:shadow-sm transition">
+                <div>
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="text-xs font-bold bg-sky-500 text-white px-2 py-0.5 rounded">No. 3</span>
+                    <span class="text-xs text-slate-500 font-semibold">約15分 / 最大 30点</span>
+                  </div>
+                  <h4 class="font-bold text-slate-800 text-base">ピクチャーコミュニケーション</h4>
+                  <p class="text-xs text-slate-600 mt-1 leading-relaxed">
+                    絵だけでお題を伝えよう！<br>
+                    <span class="text-sky-700 font-semibold">＜優しい問題1点〜難しい問題3点までの計20問＞</span>
+                  </p>
+                </div>
+
+                <div class="mt-4 pt-3 border-t border-sky-200/80 space-y-2">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs text-slate-500">獲得合計得点を入力</span>
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <label class="text-sm font-bold text-slate-700">得点:</label>
+                    <div class="flex items-center gap-1">
+                      <input type="number" id="input-score-3" min="0" max="30" onchange="updateScore(3, this.value)" 
+                        class="w-20 text-right font-extrabold score-font text-2xl text-sky-900 border-2 border-sky-300 rounded-lg p-1.5 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 bg-white" placeholder="0">
+                      <span class="text-sm font-bold text-slate-500">点</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 黄色グループ -->
+          <div>
+            <div class="flex items-center gap-2 mb-4 pb-2 border-b-2 border-yellow-300">
+              <span class="w-3.5 h-3.5 rounded-full bg-yellow-500"></span>
+              <h3 class="font-bold text-lg text-slate-800">黄色グループ種目 (No.4 〜 6)</h3>
+              <span id="badge-group-yellow" class="ml-auto text-xs px-2.5 py-1 rounded-full font-bold"></span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <!-- No.4 ヘリウムリング -->
+              <div class="border border-yellow-200 bg-yellow-50/50 rounded-xl p-4 flex flex-col justify-between hover:shadow-sm transition">
+                <div>
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="text-xs font-bold bg-yellow-500 text-white px-2 py-0.5 rounded">No. 4</span>
+                    <span class="text-xs text-slate-500 font-semibold">約20分 / 最大 30点</span>
+                  </div>
+                  <h4 class="font-bold text-slate-800 text-base">ヘリウムリング</h4>
+                  <p class="text-xs text-slate-600 mt-1 leading-relaxed">
+                    息を合わせ、フープを下まで降ろそう！<br>
+                    <span class="text-yellow-800 font-semibold">＜チャレンジ10点、惜しい20点、達成30点＞</span>
+                  </p>
+                </div>
+
+                <div class="mt-4 pt-3 border-t border-yellow-200/80 space-y-2">
+                  <div class="flex items-center gap-1 justify-between flex-wrap">
+                    <button type="button" onclick="setPresetScore(4, 10)" class="px-2 py-1 text-xs bg-white hover:bg-yellow-100 border border-yellow-300 rounded font-medium text-yellow-900 transition">10点</button>
+                    <button type="button" onclick="setPresetScore(4, 20)" class="px-2 py-1 text-xs bg-white hover:bg-yellow-100 border border-yellow-300 rounded font-medium text-yellow-900 transition">20点</button>
+                    <button type="button" onclick="setPresetScore(4, 30)" class="px-2 py-1 text-xs bg-yellow-400 hover:bg-yellow-500 text-yellow-950 font-bold rounded shadow-sm transition">30点</button>
+                    <button type="button" onclick="setPresetScore(4, 0)" class="px-1.5 py-1 text-xs text-slate-400 hover:text-slate-600">取消</button>
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <label class="text-sm font-bold text-slate-700">得点:</label>
+                    <div class="flex items-center gap-1">
+                      <input type="number" id="input-score-4" min="0" max="30" onchange="updateScore(4, this.value)" 
+                        class="w-20 text-right font-extrabold score-font text-2xl text-yellow-900 border-2 border-yellow-300 rounded-lg p-1.5 focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500 bg-white" placeholder="0">
+                      <span class="text-sm font-bold text-slate-500">点</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- No.5 トラフィックジャム -->
+              <div class="border border-yellow-200 bg-yellow-50/50 rounded-xl p-4 flex flex-col justify-between hover:shadow-sm transition">
+                <div>
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="text-xs font-bold bg-yellow-500 text-white px-2 py-0.5 rounded">No. 5</span>
+                    <span class="text-xs text-slate-500 font-semibold">約20分 / 最大 30点</span>
+                  </div>
+                  <h4 class="font-bold text-slate-800 text-base">トラフィックジャム</h4>
+                  <p class="text-xs text-slate-600 mt-1 leading-relaxed">
+                    左右の位置を完全に入れ替えよう！<br>
+                    <span class="text-yellow-800 font-semibold">＜チャレンジ10点、惜しい20点、達成30点＞</span>
+                  </p>
+                </div>
+
+                <div class="mt-4 pt-3 border-t border-yellow-200/80 space-y-2">
+                  <div class="flex items-center gap-1 justify-between flex-wrap">
+                    <button type="button" onclick="setPresetScore(5, 10)" class="px-2 py-1 text-xs bg-white hover:bg-yellow-100 border border-yellow-300 rounded font-medium text-yellow-900 transition">10点</button>
+                    <button type="button" onclick="setPresetScore(5, 20)" class="px-2 py-1 text-xs bg-white hover:bg-yellow-100 border border-yellow-300 rounded font-medium text-yellow-900 transition">20点</button>
+                    <button type="button" onclick="setPresetScore(5, 30)" class="px-2 py-1 text-xs bg-yellow-400 hover:bg-yellow-500 text-yellow-950 font-bold rounded shadow-sm transition">30点</button>
+                    <button type="button" onclick="setPresetScore(5, 0)" class="px-1.5 py-1 text-xs text-slate-400 hover:text-slate-600">取消</button>
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <label class="text-sm font-bold text-slate-700">得点:</label>
+                    <div class="flex items-center gap-1">
+                      <input type="number" id="input-score-5" min="0" max="30" onchange="updateScore(5, this.value)" 
+                        class="w-20 text-right font-extrabold score-font text-2xl text-yellow-900 border-2 border-yellow-300 rounded-lg p-1.5 focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500 bg-white" placeholder="0">
+                      <span class="text-sm font-bold text-slate-500">点</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- No.6 Aフレーム -->
+              <div class="border border-yellow-200 bg-yellow-50/50 rounded-xl p-4 flex flex-col justify-between hover:shadow-sm transition">
+                <div>
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="text-xs font-bold bg-yellow-500 text-white px-2 py-0.5 rounded">No. 6</span>
+                    <span class="text-xs text-slate-500 font-semibold">約20分 / 最大 30点</span>
+                  </div>
+                  <h4 class="font-bold text-slate-800 text-base">Aフレーム</h4>
+                  <p class="text-xs text-slate-600 mt-1 leading-relaxed">
+                    板の上から落ちずに、全員で位置を入れ替えよう！<br>
+                    <span class="text-yellow-800 font-semibold">＜チャレンジ10点、惜しい20点、達成30点＞</span>
+                  </p>
+                </div>
+
+                <div class="mt-4 pt-3 border-t border-yellow-200/80 space-y-2">
+                  <div class="flex items-center gap-1 justify-between flex-wrap">
+                    <button type="button" onclick="setPresetScore(6, 10)" class="px-2 py-1 text-xs bg-white hover:bg-yellow-100 border border-yellow-300 rounded font-medium text-yellow-900 transition">10点</button>
+                    <button type="button" onclick="setPresetScore(6, 20)" class="px-2 py-1 text-xs bg-white hover:bg-yellow-100 border border-yellow-300 rounded font-medium text-yellow-900 transition">20点</button>
+                    <button type="button" onclick="setPresetScore(6, 30)" class="px-2 py-1 text-xs bg-yellow-400 hover:bg-yellow-500 text-yellow-950 font-bold rounded shadow-sm transition">30点</button>
+                    <button type="button" onclick="setPresetScore(6, 0)" class="px-1.5 py-1 text-xs text-slate-400 hover:text-slate-600">取消</button>
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <label class="text-sm font-bold text-slate-700">得点:</label>
+                    <div class="flex items-center gap-1">
+                      <input type="number" id="input-score-6" min="0" max="30" onchange="updateScore(6, this.value)" 
+                        class="w-20 text-right font-extrabold score-font text-2xl text-yellow-900 border-2 border-yellow-300 rounded-lg p-1.5 focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500 bg-white" placeholder="0">
+                      <span class="text-sm font-bold text-slate-500">点</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 赤色/オレンジグループ -->
+          <div>
+            <div class="flex items-center gap-2 mb-4 pb-2 border-b-2 border-rose-300">
+              <span class="w-3.5 h-3.5 rounded-full bg-rose-500"></span>
+              <h3 class="font-bold text-lg text-slate-800">赤色グループ種目 (No.7 〜 8)</h3>
+              <span id="badge-group-red" class="ml-auto text-xs px-2.5 py-1 rounded-full font-bold"></span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <!-- No.7 スーパー神経衰弱 -->
+              <div class="border border-rose-200 bg-rose-50/50 rounded-xl p-4 flex flex-col justify-between hover:shadow-sm transition">
+                <div>
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="text-xs font-bold bg-rose-500 text-white px-2 py-0.5 rounded">No. 7</span>
+                    <span class="text-xs text-slate-500 font-semibold">約30分 / 最大 30点</span>
+                  </div>
+                  <h4 class="font-bold text-slate-800 text-base">スーパー神経衰弱</h4>
+                  <p class="text-xs text-slate-600 mt-1 leading-relaxed">
+                    時間内に26ペアに挑戦！<br>
+                    <span class="text-rose-800 font-semibold">＜1ペア1点、全26ペア完成でボーナス点加算（最大30点）＞</span>
+                  </p>
+                </div>
+
+                <div class="mt-4 pt-3 border-t border-rose-200/80 space-y-2">
+                  <div class="flex items-center gap-1 justify-between flex-wrap">
+                    <button type="button" onclick="setPresetScore(7, 30)" class="px-2 py-1 text-xs bg-rose-500 hover:bg-rose-600 text-white font-bold rounded shadow-sm transition">全26ペア完成 (30点)</button>
+                    <button type="button" onclick="setPresetScore(7, 20)" class="px-2 py-1 text-xs bg-white hover:bg-rose-100 border border-rose-300 rounded font-medium text-rose-900 transition">20ペア (20点)</button>
+                    <button type="button" onclick="setPresetScore(7, 0)" class="px-1.5 py-1 text-xs text-slate-400 hover:text-slate-600">取消</button>
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <label class="text-sm font-bold text-slate-700">得点:</label>
+                    <div class="flex items-center gap-1">
+                      <input type="number" id="input-score-7" min="0" max="30" onchange="updateScore(7, this.value)" 
+                        class="w-20 text-right font-extrabold score-font text-2xl text-rose-900 border-2 border-rose-300 rounded-lg p-1.5 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 bg-white" placeholder="0">
+                      <span class="text-sm font-bold text-slate-500">点</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- No.8 パイプライン -->
+              <div class="border border-rose-200 bg-rose-50/50 rounded-xl p-4 flex flex-col justify-between hover:shadow-sm transition">
+                <div>
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="text-xs font-bold bg-rose-500 text-white px-2 py-0.5 rounded">No. 8</span>
+                    <span class="text-xs text-slate-500 font-semibold">約30分 / 最大 30点</span>
+                  </div>
+                  <h4 class="font-bold text-slate-800 text-base">パイプライン</h4>
+                  <p class="text-xs text-slate-600 mt-1 leading-relaxed">
+                    10個のボールをパイプでゴールへ！<br>
+                    <span class="text-rose-800 font-semibold">＜成功数 × 3点＞</span>
+                  </p>
+                </div>
+
+                <div class="mt-4 pt-3 border-t border-rose-200/80 space-y-2">
+                  <div class="flex items-center justify-between">
+                    <label class="text-xs text-slate-600">成功ボール数:</label>
+                    <div class="flex items-center gap-1">
+                      <select id="input-item-8-wins" onchange="calcWinsScore(8, this.value)" class="text-xs border border-rose-300 rounded p-1 bg-white">
+                        <option value="">- 手動入力 -</option>
+                        <option value="1">1個 (3点)</option>
+                        <option value="2">2個 (6点)</option>
+                        <option value="3">3個 (9点)</option>
+                        <option value="4">4個 (12点)</option>
+                        <option value="5">5個 (15点)</option>
+                        <option value="6">6個 (18点)</option>
+                        <option value="7">7個 (21点)</option>
+                        <option value="8">8個 (24点)</option>
+                        <option value="9">9個 (27点)</option>
+                        <option value="10">10個 (30点)</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <label class="text-sm font-bold text-slate-700">得点:</label>
+                    <div class="flex items-center gap-1">
+                      <input type="number" id="input-score-8" min="0" max="30" onchange="updateScore(8, this.value)" 
+                        class="w-20 text-right font-extrabold score-font text-2xl text-rose-900 border-2 border-rose-300 rounded-lg p-1.5 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 bg-white" placeholder="0">
+                      <span class="text-sm font-bold text-slate-500">点</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 最終チャレンジ -->
+          <div class="bg-gradient-to-r from-purple-50 via-indigo-50 to-purple-50 border-2 border-purple-200 rounded-2xl p-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 mb-4 border-b border-purple-200">
+              <div>
+                <span class="text-xs font-bold uppercase tracking-wider bg-purple-600 text-white px-2.5 py-0.5 rounded-full">最終チャレンジ</span>
+                <h3 class="text-lg font-bold text-purple-950 mt-1">14時45分開始予定 最終チャレンジ順位</h3>
+                <p class="text-xs text-purple-700">順位を選択すると得点が自動反映されます（配点表: 1位60点, 2位50点, 3位45点, 4位40点, 5位35点, 6位30点, 7位25点, 8位20点, 9位15点）</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="openFinalRankModal()" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold shadow-sm transition flex items-center gap-1">
+                  <i class="fa-solid fa-list-ol"></i> 順位を一括設定
+                </button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center">
+              <div>
+                <label class="block text-sm font-bold text-purple-900 mb-1">このチームの最終チャレンジ着順:</label>
+                <div class="flex items-center gap-3">
+                  <select id="input-final-rank" onchange="updateFinalRank(this.value)" class="text-base font-bold bg-white border-2 border-purple-300 rounded-xl p-2.5 text-purple-900 focus:ring-purple-500 focus:border-purple-500 block w-full max-w-xs shadow-sm">
+                    <option value="">-- 着順を選択 --</option>
+                    <option value="1">1位 (60点)</option>
+                    <option value="2">2位 (50点)</option>
+                    <option value="3">3位 (45点)</option>
+                    <option value="4">4位 (40点)</option>
+                    <option value="5">5位 (35点)</option>
+                    <option value="6">6位 (30点)</option>
+                    <option value="7">7位 (25点)</option>
+                    <option value="8">8位 (20点)</option>
+                    <option value="9">9位 (15点)</option>
+                  </select>
+                  <button type="button" onclick="clearFinalRank()" class="text-xs text-purple-400 hover:text-purple-600 underline whitespace-nowrap">クリア</button>
+                </div>
+                <div id="final-rank-warning" class="text-xs text-rose-600 mt-1 font-semibold hidden">
+                  <i class="fa-solid fa-circle-exclamation mr-1"></i>この順位はすでに他のチームで選択されています
+                </div>
+              </div>
+
+              <div class="bg-white/80 border border-purple-200 rounded-xl p-4 flex items-center justify-between">
+                <div>
+                  <span class="text-xs text-purple-800 font-medium">最終チャレンジ加算点:</span>
+                  <div class="text-xs text-slate-500">総合得点に直接加算されます</div>
+                </div>
+                <div class="flex items-baseline gap-1">
+                  <span id="final-rank-score-display" class="text-3xl font-extrabold score-font text-purple-700">0</span>
+                  <span class="text-xs font-bold text-purple-600">点</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- カード下部アクション -->
+        <div class="bg-slate-50 border-t border-slate-200 px-6 py-4 flex items-center justify-between">
+          <button type="button" onclick="navigateTeam(-1)" class="px-4 py-2 bg-white border border-slate-300 hover:bg-slate-100 rounded-lg text-sm font-semibold text-slate-700 transition flex items-center gap-1.5 shadow-sm">
+            <i class="fa-solid fa-arrow-left"></i> 前のチーム
+          </button>
+          <span class="text-xs text-slate-400 font-medium">自動保存有効 (LocalStorage)</span>
+          <button type="button" onclick="navigateTeam(1)" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition flex items-center gap-1.5 shadow-sm">
+            次のチーム <i class="fa-solid fa-arrow-right"></i>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== TAB 2: 順位表・ランキング ========== -->
+    <section id="tab-ranking" class="hidden space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+        <div>
+          <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+            <i class="fa-solid fa-ranking-star text-amber-500"></i>
+            現在の総合順位表
+          </h2>
+          <p class="text-sm text-slate-500 mt-0.5">全チームの得点と達成状況のリアルタイム一覧です。</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="switchTab('projector')" class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-lg text-sm shadow transition flex items-center gap-1.5">
+            <i class="fa-solid fa-display"></i> プロジェクター投影へ
+          </button>
+        </div>
+      </div>
+
+      <!-- テーブル一覧 -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-slate-900 text-white text-xs font-bold uppercase tracking-wider">
+                <th class="py-3.5 px-4 text-center w-16">順位</th>
+                <th class="py-3.5 px-4">チーム名</th>
+                <th class="py-3.5 px-4 text-center">水色達成<br><span class="text-[10px] text-sky-300 font-normal">No.1〜3</span></th>
+                <th class="py-3.5 px-4 text-center">黄色達成<br><span class="text-[10px] text-yellow-300 font-normal">No.4〜6</span></th>
+                <th class="py-3.5 px-4 text-center">赤色達成<br><span class="text-[10px] text-rose-300 font-normal">No.7〜8</span></th>
+                <th class="py-3.5 px-4 text-center">色チェック</th>
+                <th class="py-3.5 px-4 text-right">種目小計</th>
+                <th class="py-3.5 px-4 text-right">最終順位(得点)</th>
+                <th class="py-3.5 px-4 text-right">総合得点</th>
+                <th class="py-3.5 px-4 text-center w-24">操作</th>
+              </tr>
+            </thead>
+            <tbody id="ranking-table-body" class="divide-y divide-slate-200 text-sm">
+              <!-- JSで動的描画 -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== TAB 3: プロジェクター投影モード ========== -->
+    <section id="tab-projector" class="hidden">
+      <!-- 通常モードのコンテナ -->
+      <div id="projector-container" class="bg-slate-950 text-white rounded-2xl p-6 sm:p-8 shadow-2xl border border-slate-800 space-y-6">
+        
+        <!-- コントロールバー -->
+        <div class="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-800">
+          <div>
+            <span class="text-xs uppercase tracking-widest text-amber-400 font-bold bg-amber-950/60 border border-amber-500/30 px-2.5 py-0.5 rounded-full">
+              STAGE PRESENTATION
+            </span>
+            <h2 class="text-2xl sm:text-3xl font-black text-white mt-1 tracking-wide flex items-center gap-2">
+              古田土会計チャレンジプログラム
+              <span class="text-amber-400 font-light">得点ランキング</span>
+            </h2>
+          </div>
+
+          <div class="flex items-center gap-3 flex-wrap">
+            <button onclick="toggleFullScreen()" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-bold transition flex items-center gap-1.5 border border-slate-700">
+              <i class="fa-solid fa-expand"></i> 全画面表示 (F11)
+            </button>
+            <button onclick="startCeremonyMode()" class="px-4 py-2 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-slate-950 font-black rounded-lg text-sm shadow-lg shadow-amber-500/20 transition flex items-center gap-2 animate-bounce">
+              <i class="fa-solid fa-champagne-glasses"></i> 結果発表セレモニー開始！
+            </button>
+          </div>
+        </div>
+
+        <!-- プロジェクター用ランキングボード -->
+        <div id="projector-ranking-board" class="grid grid-cols-1 gap-3">
+          <!-- JSで動的生成 -->
+        </div>
+
+      </div>
+
+      <!-- セレモニー発表モード用オーバーレイ (初期非表示) -->
+      <div id="ceremony-overlay" class="hidden fixed inset-0 z-50 bg-slate-950 flex flex-col justify-between p-6 sm:p-12 text-white">
+        <!-- トップバー -->
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center font-black text-xl">
+              ★
+            </div>
+            <div>
+              <div class="text-xs text-amber-400 uppercase tracking-widest font-bold">AWARDS CEREMONY</div>
+              <h2 class="text-xl font-black text-white">古田土会計チャレンジプログラム 総合結果発表</h2>
+            </div>
+          </div>
+          <button onclick="exitCeremonyMode()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold text-slate-300">
+            <i class="fa-solid fa-xmark mr-1"></i> 終了
+          </button>
+        </div>
+
+        <!-- 発表中央ステージ -->
+        <div class="flex-1 flex flex-col items-center justify-center py-6 text-center max-w-4xl mx-auto w-full">
+          <div id="ceremony-step-label" class="text-amber-400 text-xl sm:text-2xl font-bold mb-2 animate-pulse">
+            第 9 位の発表
+          </div>
+
+          <!-- スコアカードボックス -->
+          <div id="ceremony-card" class="w-full bg-gradient-to-b from-slate-900 to-slate-900/90 border-2 border-slate-700 rounded-3xl p-8 sm:p-12 shadow-2xl relative overflow-hidden transition-all duration-700">
+            <!-- 発表前プレースホルダー -->
+            <div id="ceremony-hidden-state" class="py-12 space-y-4">
+              <div class="w-20 h-20 mx-auto rounded-full bg-slate-800 flex items-center justify-center text-4xl text-slate-500 font-bold">
+                ?
+              </div>
+              <p class="text-slate-400 text-lg">スペースキー または「発表！」ボタンを押してください</p>
+            </div>
+
+            <!-- 発表後表示 -->
+            <div id="ceremony-revealed-state" class="hidden space-y-4 animate-fade-in">
+              <div id="ceremony-rank-title" class="text-2xl font-black text-amber-300">第 9 位</div>
+              <h3 id="ceremony-team-name" class="text-4xl sm:text-6xl font-black text-white tracking-wide">チーム名</h3>
+              
+              <div class="flex items-center justify-center gap-6 pt-4">
+                <div class="text-center">
+                  <span class="text-xs text-slate-400 block">種目得点</span>
+                  <span id="ceremony-challenge-score" class="text-3xl score-font text-sky-400 font-bold">0</span>
+                  <span class="text-xs text-slate-400">点</span>
+                </div>
+                <div class="text-slate-600 text-2xl">+</div>
+                <div class="text-center">
+                  <span class="text-xs text-slate-400 block">最終チャレンジ得点</span>
+                  <span id="ceremony-final-score" class="text-3xl score-font text-purple-400 font-bold">0</span>
+                  <span class="text-xs text-slate-400">点</span>
+                </div>
+                <div class="text-slate-600 text-2xl">=</div>
+                <div class="text-center bg-amber-500/10 border border-amber-500/30 px-6 py-2 rounded-2xl">
+                  <span class="text-xs text-amber-300 block font-bold">合計総合得点</span>
+                  <span id="ceremony-total-score" class="text-5xl sm:text-6xl score-font text-amber-400 font-black">0</span>
+                  <span class="text-xs text-amber-300">点</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- コントロールボタン -->
+        <div class="flex items-center justify-center gap-4">
+          <button id="ceremony-prev-btn" onclick="prevCeremonyStep()" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-sm font-bold transition">
+            <i class="fa-solid fa-arrow-left mr-1"></i> 前の順位
+          </button>
+          <button id="ceremony-action-btn" onclick="triggerCeremonyAction()" class="px-8 py-3 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-slate-950 font-black text-lg rounded-xl shadow-xl transition transform active:scale-95">
+            発表する！
+          </button>
+          <button id="ceremony-next-btn" onclick="nextCeremonyStep()" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-sm font-bold transition">
+            次の順位 <i class="fa-solid fa-arrow-right ml-1"></i>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== TAB 4: 印刷プレビュー ========== -->
+    <section id="tab-print" class="hidden space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+        <div>
+          <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+            <i class="fa-solid fa-print text-indigo-600"></i>
+            印刷プレビュー & A4シート出力
+          </h2>
+          <p class="text-sm text-slate-500 mt-0.5">用紙に合わせてプリンター出力・PDF保存が可能です。</p>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <select id="print-mode-select" onchange="renderPrintPreview()" class="text-sm border border-slate-300 rounded-lg p-2 bg-slate-50 font-bold">
+            <option value="all-sheets">【A4横】全チーム得点表シート（原本デザイン）</option>
+            <option value="single-sheet">【A4横】選択中チーム得点表シートのみ</option>
+            <option value="blank-sheet">【A4横】手書き用白紙得点表シート</option>
+            <option value="ranking-report">【A4縦】総合結果一覧表レポート</option>
+          </select>
+          <button onclick="window.print()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-sm shadow transition flex items-center gap-1.5">
+            <i class="fa-solid fa-print"></i> 印刷する (Ctrl+P)
+          </button>
+        </div>
+      </div>
+
+      <!-- 印刷プレビューコンテナ -->
+      <div class="bg-slate-200 p-6 rounded-2xl flex justify-center overflow-x-auto">
+        <div id="print-preview-area" class="bg-white shadow-xl rounded-lg p-6 max-w-5xl w-full min-h-[600px]">
+          <!-- JSで印刷プレビューをレンダリング -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== TAB 5: 設定・管理 ========== -->
+    <section id="tab-settings" class="hidden space-y-6">
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-6">
+        <div>
+          <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+            <i class="fa-solid fa-sliders text-blue-600"></i>
+            システム設定 & チーム管理
+          </h2>
+          <p class="text-sm text-slate-500 mt-1">チームの追加・削除や、配点設定、データのバックアップと復元を行います。</p>
+        </div>
+
+        <!-- チーム数・チーム名設定 -->
+        <div class="pt-4 border-t border-slate-200 space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="font-bold text-base text-slate-800 flex items-center gap-2">
+              <i class="fa-solid fa-users text-slate-600"></i>
+              チームリスト管理
+            </h3>
+            <button onclick="addNewTeam()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-sm transition flex items-center gap-1">
+              <i class="fa-solid fa-plus"></i> チームを追加
+            </button>
+          </div>
+
+          <div id="settings-team-list" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            <!-- JSで動的生成 -->
+          </div>
+        </div>
+
+        <!-- 最終チャレンジ配点ルール -->
+        <div class="pt-6 border-t border-slate-200 space-y-3">
+          <h3 class="font-bold text-base text-slate-800 flex items-center gap-2">
+            <i class="fa-solid fa-award text-purple-600"></i>
+            最終チャレンジ順位配点テーブル
+          </h3>
+          <p class="text-xs text-slate-500">標準ルール（1位60点〜9位15点）の配点設定です。</p>
+          <div id="final-points-rule-display" class="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-9 gap-2 text-center text-xs">
+            <!-- JSで動的生成 -->
+          </div>
+        </div>
+
+        <!-- データ管理（保存・復元・リセット） -->
+        <div class="pt-6 border-t border-slate-200 space-y-3">
+          <h3 class="font-bold text-base text-slate-800 flex items-center gap-2">
+            <i class="fa-solid fa-database text-emerald-600"></i>
+            データ管理 & バックアップ
+          </h3>
+          <div class="flex flex-wrap items-center gap-3">
+            <button onclick="exportDataJson()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-lg shadow-sm transition flex items-center gap-1.5">
+              <i class="fa-solid fa-download"></i> JSONバックアップ保存
+            </button>
+            <label class="px-4 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs font-bold rounded-lg cursor-pointer transition flex items-center gap-1.5">
+              <i class="fa-solid fa-upload"></i> JSONバックアップ復元
+              <input type="file" accept=".json" onchange="importDataJson(event)" class="hidden">
+            </label>
+            <button onclick="resetAllScoresOnly()" class="px-4 py-2 bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-800 text-xs font-bold rounded-lg transition flex items-center gap-1.5">
+              <i class="fa-solid fa-eraser"></i> 得点のみクリア
+            </button>
+            <button onclick="resetAllDataFactory()" class="px-4 py-2 bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-700 text-xs font-bold rounded-lg transition flex items-center gap-1.5 ml-auto">
+              <i class="fa-solid fa-trash-can"></i> 初期状態に戻す
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==================== 印刷用 DOM (印刷時のみ出力) ==================== -->
+  <div id="print-sheet-container" class="print-only">
+    <!-- JSで印刷時に動的に流し込み -->
+  </div>
+
+  <!-- ==================== 最終チャレンジ順位一括設定モーダル ==================== -->
+  <div id="final-rank-modal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200">
+      <div class="bg-purple-900 text-white p-4 flex items-center justify-between">
+        <h3 class="font-bold text-base flex items-center gap-2">
+          <i class="fa-solid fa-list-ol"></i> 最終チャレンジ順位 一括割り当て
+        </h3>
+        <button onclick="closeFinalRankModal()" class="text-purple-300 hover:text-white">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+      <div class="p-4 space-y-3">
+        <p class="text-xs text-slate-500">
+          各順位（1位〜）に該当するチームを選択してください。選択した順位の得点が自動適用されます。
+        </p>
+        <div id="modal-rank-assign-list" class="space-y-2 max-h-80 overflow-y-auto pr-1">
+          <!-- JSで動的生成 -->
+        </div>
+      </div>
+      <div class="bg-slate-50 px-4 py-3 border-t border-slate-200 flex justify-end gap-2">
+        <button onclick="closeFinalRankModal()" class="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-200 rounded-lg">キャンセル</button>
+        <button onclick="saveBatchFinalRanks()" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-lg shadow">決定して反映</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== フッター ==================== -->
+  <footer class="no-print bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-400">
+    古田土会計チャレンジプログラム 得点集計システム &copy; 2026
+  </footer>
+
+  <!-- ==================== JavaScript ロジック ==================== -->
+  <script>
+    // 種目マスタデータ（元画像に基づく）
+    const CHALLENGE_ITEMS = [
+      { id: 1, group: 'blue', color: '#0284c7', name: 'じゃんけんチャレンジ', desc: 'スタッフと順番にじゃんけん！スタッフ1人につき1回チャレンジ（何人でも可）＜最高連続勝利数×3点＞', max: 30, time: '' },
+      { id: 2, group: 'blue', color: '#0284c7', name: '割り箸切りチャレンジ', desc: 'カードで割り箸切り！＜成功本数×3点＞', max: 30, time: '約10分' },
+      { id: 3, group: 'blue', color: '#0284c7', name: 'ピクチャーコミュニケーション', desc: '絵だけでお題を伝えよう！＜優しい問題1点〜難しい問題3点までの計20問＞', max: 30, time: '約15分' },
+      { id: 4, group: 'yellow', color: '#ca8a04', name: 'ヘリウムリング', desc: '息を合わせ、フープを下まで降ろそう！＜チャレンジ10点、惜しい20点、達成30点＞', max: 30, time: '約20分' },
+      { id: 5, group: 'yellow', color: '#ca8a04', name: 'トラフィックジャム', desc: '左右の位置を完全に入れ替えよう！＜チャレンジ10点、惜しい20点、達成30点＞', max: 30, time: '約20分' },
+      { id: 6, group: 'yellow', color: '#ca8a04', name: 'Aフレーム', desc: '板の上から落ちずに、全員で位置を入れ替えよう！＜チャレンジ10点、惜しい20点、達成30点＞', max: 30, time: '約20分' },
+      { id: 7, group: 'red', color: '#dc2626', name: 'スーパー神経衰弱', desc: '時間内に26ペアに挑戦！＜1ペア1点、全26ペア完成でボーナス点加算＞', max: 30, time: '約30分' },
+      { id: 8, group: 'red', color: '#dc2626', name: 'パイプライン', desc: '10個のボールをパイプでゴールへ！＜成功数×3点＞', max: 30, time: '約30分' },
+    ];
+
+    // 最終チャレンジ順位別配点マスタ (1位60点〜9位15点)
+    const FINAL_POINTS_TABLE = {
+      1: 60,
+      2: 50,
+      3: 45,
+      4: 40,
+      5: 35,
+      6: 30,
+      7: 25,
+      8: 20,
+      9: 15,
+      10: 10,
+      11: 10,
+      12: 10
+    };
+
+    // アプリケーション状態
+    const STORAGE_KEY = 'kodato_challenge_data_v1';
+    let appState = {
+      teams: [],
+      selectedTeamId: 1,
+      currentTab: 'input',
+      ceremonyStepIndex: 0,
+      ceremonyRevealed: false
+    };
+
+    // 初期化
+    window.addEventListener('DOMContentLoaded', () => {
+      loadData();
+      renderAll();
+      setupKeyboardListeners();
+    });
+
+    // デフォルトデータの生成 (9チーム)
+    function createInitialTeams() {
+      const teams = [];
+      for (let i = 1; i <= 9; i++) {
+        teams.push({
+          id: i,
+          name: `チーム ${i}`,
+          scores: { 1: null, 2: null, 3: null, 4: null, 5: null, 6: null, 7: null, 8: null },
+          finalRank: null,
+          finalScore: 0
+        });
+      }
+      return teams;
+    }
+
+    // データ読み込み
+    function loadData() {
+      try {
+        const json = localStorage.getItem(STORAGE_KEY);
+        if (json) {
+          const parsed = JSON.parse(json);
+          if (parsed && Array.isArray(parsed.teams) && parsed.teams.length > 0) {
+            appState.teams = parsed.teams;
+            appState.selectedTeamId = parsed.selectedTeamId || appState.teams[0].id;
+            return;
+          }
+        }
+      } catch (e) {
+        console.error('Failed to load data from localStorage', e);
+      }
+      // フォールバック
+      appState.teams = createInitialTeams();
+      appState.selectedTeamId = 1;
+      saveData();
+    }
+
+    // データ保存
+    function saveData() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          teams: appState.teams,
+          selectedTeamId: appState.selectedTeamId
+        }));
+        showSaveIndicator();
+      } catch (e) {
+        console.error('Failed to save data', e);
+      }
+    }
+
+    function showSaveIndicator() {
+      const el = document.getElementById('save-status');
+      if (el) {
+        el.innerHTML = '<i class="fa-solid fa-check"></i> 保存完了';
+        el.classList.add('text-emerald-600');
+      }
+    }
+
+    // 全体再描画
+    function renderAll() {
+      updateTopBar();
+      renderTeamSelector();
+      renderTeamTabs();
+      renderCurrentTeamCard();
+      renderRankingTable();
+      renderProjectorBoard();
+      renderSettingsTeamList();
+      renderFinalPointsRuleDisplay();
+    }
+
+    // トップバー更新
+    function updateTopBar() {
+      document.getElementById('bar-team-count').textContent = appState.teams.length;
+    }
+
+    // チームセレクターの描画
+    function renderTeamSelector() {
+      const selector = document.getElementById('team-selector');
+      selector.innerHTML = '';
+      appState.teams.forEach(team => {
+        const opt = document.createElement('option');
+        opt.value = team.id;
+        opt.textContent = team.name;
+        if (team.id === appState.selectedTeamId) opt.selected = true;
+        selector.appendChild(opt);
+      });
+    }
+
+    // チームクイックタブの描画
+    function renderTeamTabs() {
+      const container = document.getElementById('team-tab-list');
+      container.innerHTML = '';
+      appState.teams.forEach(team => {
+        const isSelected = team.id === appState.selectedTeamId;
+        const colorStatus = checkColorStatus(team);
+        const total = calcTeamTotal(team);
+
+        const btn = document.createElement('button');
+        btn.onclick = () => selectTeam(team.id);
+        btn.className = `flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 border ${
+          isSelected 
+            ? 'bg-blue-600 text-white border-blue-600 shadow-md ring-2 ring-blue-300' 
+            : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200 shadow-sm'
+        }`;
+
+        let statusDots = '';
+        if (colorStatus.allCompleted) {
+          statusDots = '<span class="w-2 h-2 rounded-full bg-emerald-400"></span>';
+        } else {
+          statusDots = '<span class="w-2 h-2 rounded-full bg-amber-400" title="未達色あり"></span>';
+        }
+
+        btn.innerHTML = `
+          ${statusDots}
+          <span>${escapeHtml(team.name)}</span>
+          <span class="px-1.5 py-0.5 rounded text-[11px] font-extrabold ${isSelected ? 'bg-blue-800 text-blue-100' : 'bg-slate-100 text-slate-700'}">${total}点</span>
+        `;
+        container.appendChild(btn);
+      });
+    }
+
+    // チーム選択
+    function selectTeam(id) {
+      appState.selectedTeamId = parseInt(id, 10);
+      saveData();
+      renderAll();
+    }
+
+    // チーム切り替え (前/次)
+    function navigateTeam(offset) {
+      const idx = appState.teams.findIndex(t => t.id === appState.selectedTeamId);
+      if (idx === -1) return;
+      let nextIdx = idx + offset;
+      if (nextIdx < 0) nextIdx = appState.teams.length - 1;
+      if (nextIdx >= appState.teams.length) nextIdx = 0;
+      selectTeam(appState.teams[nextIdx].id);
+    }
+
+    // 現在選択中チームの詳細カード描画
+    function renderCurrentTeamCard() {
+      const team = appState.teams.find(t => t.id === appState.selectedTeamId);
+      if (!team) return;
+
+      // チーム名
+      document.getElementById('current-team-name-input').value = team.name;
+
+      // 順位
+      const ranks = calculateRankings();
+      const currentRankInfo = ranks.find(r => r.team.id === team.id);
+      const rankNum = currentRankInfo ? currentRankInfo.rank : '-';
+      document.getElementById('current-team-rank').textContent = rankNum;
+
+      const rankBadge = document.getElementById('current-team-rank-badge');
+      rankBadge.className = 'w-14 h-14 rounded-2xl flex flex-col items-center justify-center font-extrabold shadow-inner ';
+      if (rankNum === 1) rankBadge.className += 'rank-1-gold ring-2 ring-yellow-300';
+      else if (rankNum === 2) rankBadge.className += 'rank-2-silver ring-2 ring-slate-300';
+      else if (rankNum === 3) rankBadge.className += 'rank-3-bronze ring-2 ring-orange-300';
+      else rankBadge.className += 'bg-blue-600 text-white';
+
+      // カラー達成ステータス
+      const colorStatus = checkColorStatus(team);
+      const badgesContainer = document.getElementById('current-team-color-badges');
+      badgesContainer.innerHTML = `
+        <span class="text-xs px-2.5 py-1 rounded-full font-bold flex items-center gap-1 ${colorStatus.blue ? 'bg-sky-500/20 text-sky-300 border border-sky-400/40' : 'bg-slate-700/50 text-slate-400 border border-slate-600'}">
+          <i class="fa-solid ${colorStatus.blue ? 'fa-circle-check text-sky-400' : 'fa-circle-xmark'}"></i> 水色種目 ${colorStatus.blue ? '達成' : '未達'}
+        </span>
+        <span class="text-xs px-2.5 py-1 rounded-full font-bold flex items-center gap-1 ${colorStatus.yellow ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-400/40' : 'bg-slate-700/50 text-slate-400 border border-slate-600'}">
+          <i class="fa-solid ${colorStatus.yellow ? 'fa-circle-check text-yellow-400' : 'fa-circle-xmark'}"></i> 黄色種目 ${colorStatus.yellow ? '達成' : '未達'}
+        </span>
+        <span class="text-xs px-2.5 py-1 rounded-full font-bold flex items-center gap-1 ${colorStatus.red ? 'bg-rose-500/20 text-rose-300 border border-rose-400/40' : 'bg-slate-700/50 text-slate-400 border border-slate-600'}">
+          <i class="fa-solid ${colorStatus.red ? 'fa-circle-check text-rose-400' : 'fa-circle-xmark'}"></i> 赤色種目 ${colorStatus.red ? '達成' : '未達'}
+        </span>
+        ${colorStatus.allCompleted 
+          ? '<span class="text-xs px-3 py-1 rounded-full font-extrabold bg-emerald-500 text-white shadow-sm flex items-center gap-1 animate-pulse-subtle"><i class="fa-solid fa-star"></i> 全色チャレンジクリア！</span>' 
+          : '<span class="text-xs px-2.5 py-1 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-400/40 flex items-center gap-1"><i class="fa-solid fa-triangle-exclamation"></i> 未達成の色があります</span>'}
+      `;
+
+      // グループバッジ
+      document.getElementById('badge-group-blue').className = `text-xs px-2.5 py-1 rounded-full font-bold ${colorStatus.blue ? 'bg-sky-100 text-sky-800' : 'bg-slate-100 text-slate-500'}`;
+      document.getElementById('badge-group-blue').textContent = colorStatus.blue ? '✓ 実施済み' : '未実施';
+
+      document.getElementById('badge-group-yellow').className = `text-xs px-2.5 py-1 rounded-full font-bold ${colorStatus.yellow ? 'bg-yellow-100 text-yellow-800' : 'bg-slate-100 text-slate-500'}`;
+      document.getElementById('badge-group-yellow').textContent = colorStatus.yellow ? '✓ 実施済み' : '未実施';
+
+      document.getElementById('badge-group-red').className = `text-xs px-2.5 py-1 rounded-full font-bold ${colorStatus.red ? 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-500'}`;
+      document.getElementById('badge-group-red').textContent = colorStatus.red ? '✓ 実施済み' : '未実施';
+
+      // スコア表示
+      const challengeTotal = calcTeamChallengeScore(team);
+      const finalScore = team.finalScore || 0;
+      const totalScore = challengeTotal + finalScore;
+
+      document.getElementById('current-team-challenge-score').textContent = challengeTotal;
+      document.getElementById('current-team-final-score').textContent = finalScore;
+      document.getElementById('current-team-total-score').textContent = totalScore;
+
+      // 各種目入力値の反映 (1〜8)
+      for (let i = 1; i <= 8; i++) {
+        const val = team.scores[i];
+        const inputEl = document.getElementById(`input-score-${i}`);
+        if (inputEl) inputEl.value = (val !== null && val !== undefined) ? val : '';
+      }
+
+      // No.1 連勝セレクト同期
+      const val1 = team.scores[1];
+      const sel1 = document.getElementById('input-item-1-wins');
+      if (sel1) {
+        if (val1 !== null && val1 % 3 === 0 && val1 <= 30 && val1 > 0) sel1.value = val1 / 3;
+        else sel1.value = '';
+      }
+
+      // No.2 割り箸セレクト同期
+      const val2 = team.scores[2];
+      const sel2 = document.getElementById('input-item-2-wins');
+      if (sel2) {
+        if (val2 !== null && val2 % 3 === 0 && val2 <= 30 && val2 > 0) sel2.value = val2 / 3;
+        else sel2.value = '';
+      }
+
+      // No.8 パイプライン同期
+      const val8 = team.scores[8];
+      const sel8 = document.getElementById('input-item-8-wins');
+      if (sel8) {
+        if (val8 !== null && val8 % 3 === 0 && val8 <= 30 && val8 > 0) sel8.value = val8 / 3;
+        else sel8.value = '';
+      }
+
+      // 最終チャレンジ順位
+      const finalRankSelect = document.getElementById('input-final-rank');
+      finalRankSelect.value = team.finalRank || '';
+      document.getElementById('final-rank-score-display').textContent = team.finalScore || 0;
+
+      // 重複チェック
+      checkFinalRankDuplication();
+    }
+
+    // チーム名変更
+    function updateCurrentTeamName(newName) {
+      const team = appState.teams.find(t => t.id === appState.selectedTeamId);
+      if (!team) return;
+      team.name = newName.trim() || `チーム ${team.id}`;
+      saveData();
+      renderAll();
+    }
+
+    // 得点更新 (No.1〜8)
+    function updateScore(itemId, rawVal) {
+      const team = appState.teams.find(t => t.id === appState.selectedTeamId);
+      if (!team) return;
+
+      if (rawVal === '' || rawVal === null) {
+        team.scores[itemId] = null;
+      } else {
+        let num = parseInt(rawVal, 10);
+        if (isNaN(num)) num = 0;
+        if (num < 0) num = 0;
+        if (num > 30) num = 30; // 上限30点
+        team.scores[itemId] = num;
+      }
+
+      saveData();
+      renderAll();
+    }
+
+    // プリセットボタンからの設定（10/20/30点）
+    function setPresetScore(itemId, score) {
+      updateScore(itemId, score);
+    }
+
+    // 倍数計算セレクト（×3）
+    function calcWinsScore(itemId, count) {
+      if (count === '') return;
+      const cnt = parseInt(count, 10);
+      if (!isNaN(cnt)) {
+        updateScore(itemId, cnt * 3);
+      }
+    }
+
+    // 最終チャレンジ順位更新
+    function updateFinalRank(rankStr) {
+      const team = appState.teams.find(t => t.id === appState.selectedTeamId);
+      if (!team) return;
+
+      if (!rankStr) {
+        team.finalRank = null;
+        team.finalScore = 0;
+      } else {
+        const rank = parseInt(rankStr, 10);
+        team.finalRank = rank;
+        team.finalScore = FINAL_POINTS_TABLE[rank] || 0;
+      }
+
+      saveData();
+      renderAll();
+    }
+
+    function clearFinalRank() {
+      updateFinalRank('');
+    }
+
+    // 最終順位の重複チェック警告
+    function checkFinalRankDuplication() {
+      const currentTeam = appState.teams.find(t => t.id === appState.selectedTeamId);
+      const warnEl = document.getElementById('final-rank-warning');
+      if (!currentTeam || !currentTeam.finalRank) {
+        warnEl.classList.add('hidden');
+        return;
+      }
+
+      const dup = appState.teams.some(t => t.id !== currentTeam.id && t.finalRank === currentTeam.finalRank);
+      if (dup) {
+        warnEl.classList.remove('hidden');
+      } else {
+        warnEl.classList.add('hidden');
+      }
+    }
+
+    // カラー達成チェック (水色・黄色・赤色)
+    function checkColorStatus(team) {
+      // 水色: 1, 2, 3
+      const blueScores = [team.scores[1], team.scores[2], team.scores[3]].filter(v => v !== null && v !== undefined && v > 0);
+      const blue = blueScores.length > 0;
+
+      // 黄色: 4, 5, 6
+      const yellowScores = [team.scores[4], team.scores[5], team.scores[6]].filter(v => v !== null && v !== undefined && v > 0);
+      const yellow = yellowScores.length > 0;
+
+      // 赤色: 7, 8
+      const redScores = [team.scores[7], team.scores[8]].filter(v => v !== null && v !== undefined && v > 0);
+      const red = redScores.length > 0;
+
+      return {
+        blue,
+        yellow,
+        red,
+        allCompleted: blue && yellow && red,
+        completedCount: (blue ? 1 : 0) + (yellow ? 1 : 0) + (red ? 1 : 0)
+      };
+    }
+
+    // チームの種目得点合計 (No.1〜8)
+    function calcTeamChallengeScore(team) {
+      let sum = 0;
+      for (let i = 1; i <= 8; i++) {
+        const val = team.scores[i];
+        if (val !== null && val !== undefined) {
+          sum += val;
+        }
+      }
+      return sum;
+    }
+
+    // チームの総合得点
+    function calcTeamTotal(team) {
+      return calcTeamChallengeScore(team) + (team.finalScore || 0);
+    }
+
+    // 総合順位計算（同点時は同順位）
+    function calculateRankings() {
+      const sorted = [...appState.teams].map(team => {
+        const challengeScore = calcTeamChallengeScore(team);
+        const finalScore = team.finalScore || 0;
+        const total = challengeScore + finalScore;
+        const colorStatus = checkColorStatus(team);
+        return {
+          team,
+          challengeScore,
+          finalScore,
+          total,
+          colorStatus
+        };
+      }).sort((a, b) => {
+        if (b.total !== a.total) return b.total - a.total;
+        if (b.finalScore !== a.finalScore) return b.finalScore - a.finalScore;
+        return b.challengeScore - a.challengeScore;
+      });
+
+      // 順位付与 (同点対応)
+      let currentRank = 1;
+      for (let i = 0; i < sorted.length; i++) {
+        if (i > 0 && sorted[i].total === sorted[i - 1].total) {
+          sorted[i].rank = sorted[i - 1].rank;
+        } else {
+          sorted[i].rank = i + 1;
+        }
+      }
+      return sorted;
+    }
+
+    // 順位表テーブルの描画
+    function renderRankingTable() {
+      const tbody = document.getElementById('ranking-table-body');
+      tbody.innerHTML = '';
+      const rankings = calculateRankings();
+
+      rankings.forEach(item => {
+        const { team, challengeScore, finalScore, total, colorStatus, rank } = item;
+        const isSelected = team.id === appState.selectedTeamId;
+
+        let rankBadgeClass = 'bg-slate-200 text-slate-700';
+        if (rank === 1) rankBadgeClass = 'rank-1-gold font-black';
+        else if (rank === 2) rankBadgeClass = 'rank-2-silver font-black';
+        else if (rank === 3) rankBadgeClass = 'rank-3-bronze font-black';
+
+        const tr = document.createElement('tr');
+        tr.className = `hover:bg-slate-50 transition cursor-pointer ${isSelected ? 'bg-blue-50/70 font-semibold' : ''}`;
+        tr.onclick = (e) => {
+          if (!e.target.closest('button')) {
+            selectTeam(team.id);
+            switchTab('input');
+          }
+        };
+
+        tr.innerHTML = `
+          <td class="py-3 px-4 text-center">
+            <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-sm ${rankBadgeClass}">
+              ${rank}
+            </span>
+          </td>
+          <td class="py-3 px-4">
+            <div class="font-bold text-slate-900">${escapeHtml(team.name)}</div>
+          </td>
+          <td class="py-3 px-4 text-center">
+            ${colorStatus.blue 
+              ? '<span class="text-xs px-2 py-0.5 rounded-full font-bold bg-sky-100 text-sky-800">✓ クリア</span>' 
+              : '<span class="text-xs px-2 py-0.5 rounded-full font-bold bg-slate-100 text-slate-400">-</span>'}
+          </td>
+          <td class="py-3 px-4 text-center">
+            ${colorStatus.yellow 
+              ? '<span class="text-xs px-2 py-0.5 rounded-full font-bold bg-yellow-100 text-yellow-800">✓ クリア</span>' 
+              : '<span class="text-xs px-2 py-0.5 rounded-full font-bold bg-slate-100 text-slate-400">-</span>'}
+          </td>
+          <td class="py-3 px-4 text-center">
+            ${colorStatus.red 
+              ? '<span class="text-xs px-2 py-0.5 rounded-full font-bold bg-rose-100 text-rose-800">✓ クリア</span>' 
+              : '<span class="text-xs px-2 py-0.5 rounded-full font-bold bg-slate-100 text-slate-400">-</span>'}
+          </td>
+          <td class="py-3 px-4 text-center">
+            ${colorStatus.allCompleted 
+              ? '<span class="text-xs px-2 py-0.5 rounded-full font-extrabold bg-emerald-100 text-emerald-800"><i class="fa-solid fa-star text-amber-500 mr-1"></i>全色達成</span>' 
+              : '<span class="text-xs px-2 py-0.5 rounded-full font-bold bg-amber-50 text-amber-700 border border-amber-200">未達成あり</span>'}
+          </td>
+          <td class="py-3 px-4 text-right score-font text-xl text-slate-700">
+            ${challengeScore} <span class="text-xs font-sans text-slate-400">点</span>
+          </td>
+          <td class="py-3 px-4 text-right">
+            <span class="text-xs text-purple-700 font-bold">${team.finalRank ? team.finalRank + '位' : '未定'}</span>
+            <span class="score-font text-lg text-purple-800 font-bold ml-1">(${finalScore}点)</span>
+          </td>
+          <td class="py-3 px-4 text-right">
+            <span class="score-font text-2xl font-black text-blue-700">${total}</span>
+            <span class="text-xs font-sans text-slate-500">点</span>
+          </td>
+          <td class="py-3 px-4 text-center">
+            <button onclick="selectTeam(${team.id}); switchTab('input');" class="px-2.5 py-1 bg-slate-100 hover:bg-blue-600 hover:text-white rounded text-xs font-semibold text-slate-600 transition">
+              編集
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // プロジェクター用ランキングボードの描画
+    function renderProjectorBoard() {
+      const container = document.getElementById('projector-ranking-board');
+      container.innerHTML = '';
+      const rankings = calculateRankings();
+
+      rankings.forEach(item => {
+        const { team, challengeScore, finalScore, total, colorStatus, rank } = item;
+
+        let cardBg = 'bg-slate-900 border-slate-800 text-white';
+        let rankBox = 'bg-slate-800 text-slate-300';
+
+        if (rank === 1) {
+          cardBg = 'bg-gradient-to-r from-amber-950/40 via-slate-900 to-slate-900 border-amber-500/50 shadow-lg shadow-amber-500/10';
+          rankBox = 'rank-1-gold font-black shadow';
+        } else if (rank === 2) {
+          cardBg = 'bg-gradient-to-r from-slate-800/60 via-slate-900 to-slate-900 border-slate-400/40';
+          rankBox = 'rank-2-silver font-black shadow';
+        } else if (rank === 3) {
+          cardBg = 'bg-gradient-to-r from-orange-950/40 via-slate-900 to-slate-900 border-orange-500/40';
+          rankBox = 'rank-3-bronze font-black shadow';
+        }
+
+        const card = document.createElement('div');
+        card.className = `border rounded-2xl p-4 sm:p-5 flex items-center justify-between gap-4 transition-all duration-300 ${cardBg}`;
+
+        card.innerHTML = `
+          <div class="flex items-center gap-4 sm:gap-6">
+            <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center text-2xl sm:text-3xl score-font font-black ${rankBox}">
+              ${rank}
+            </div>
+            <div>
+              <div class="flex items-center gap-2 sm:gap-3 flex-wrap">
+                <h3 class="text-xl sm:text-2xl font-black text-white tracking-wide">${escapeHtml(team.name)}</h3>
+                ${colorStatus.allCompleted 
+                  ? '<span class="text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full font-bold flex items-center gap-1"><i class="fa-solid fa-star text-amber-400"></i>全色達成</span>' 
+                  : '<span class="text-xs bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-semibold">色未達あり</span>'}
+              </div>
+              <div class="text-xs text-slate-400 mt-1 flex items-center gap-3">
+                <span>種目: <strong class="text-sky-300 font-bold">${challengeScore}</strong>点</span>
+                <span>•</span>
+                <span>最終チャレ: <strong class="text-purple-300 font-bold">${finalScore}</strong>点 (${team.finalRank ? team.finalRank + '位' : '未定'})</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="text-right">
+            <span class="text-[11px] text-slate-400 uppercase tracking-widest block font-bold">Total Score</span>
+            <div class="flex items-baseline justify-end gap-1">
+              <span class="text-4xl sm:text-5xl font-black score-font text-amber-400 leading-none">${total}</span>
+              <span class="text-xs sm:text-sm font-bold text-amber-300">点</span>
+            </div>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    // セレモニー（順位発表）モード
+    let ceremonyRankingList = [];
+    function startCeremonyMode() {
+      // 順位発表は最下位（9位）から1位へとカウントアップ
+      const rankings = calculateRankings();
+      ceremonyRankingList = [...rankings].reverse(); // 9位 -> 1位
+      appState.ceremonyStepIndex = 0;
+      appState.ceremonyRevealed = false;
+
+      document.getElementById('ceremony-overlay').classList.remove('hidden');
+      updateCeremonyDisplay();
+    }
+
+    function exitCeremonyMode() {
+      document.getElementById('ceremony-overlay').classList.add('hidden');
+    }
+
+    function updateCeremonyDisplay() {
+      if (appState.ceremonyStepIndex >= ceremonyRankingList.length) {
+        // 全員発表終了
+        triggerGrandConfetti();
+        document.getElementById('ceremony-step-label').textContent = '全順位 発表完了！おめでとうございます！';
+        document.getElementById('ceremony-action-btn').textContent = '最初に戻る';
+        return;
+      }
+
+      const item = ceremonyRankingList[appState.ceremonyStepIndex];
+      const isTop3 = item.rank <= 3;
+
+      document.getElementById('ceremony-step-label').textContent = `第 ${item.rank} 位の発表`;
+      
+      const hiddenState = document.getElementById('ceremony-hidden-state');
+      const revealedState = document.getElementById('ceremony-revealed-state');
+      const card = document.getElementById('ceremony-card');
+      const actionBtn = document.getElementById('ceremony-action-btn');
+
+      if (!appState.ceremonyRevealed) {
+        hiddenState.classList.remove('hidden');
+        revealedState.classList.add('hidden');
+        card.className = 'w-full bg-slate-900 border-2 border-slate-700 rounded-3xl p-8 sm:p-12 shadow-2xl relative overflow-hidden transition-all duration-700';
+        actionBtn.textContent = isTop3 ? '🎉 発表する！！' : '発表する！';
+        actionBtn.className = 'px-8 py-3 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-slate-950 font-black text-lg rounded-xl shadow-xl transition transform active:scale-95 animate-pulse';
+      } else {
+        hiddenState.classList.add('hidden');
+        revealedState.classList.remove('hidden');
+
+        document.getElementById('ceremony-rank-title').textContent = `第 ${item.rank} 位`;
+        document.getElementById('ceremony-team-name').textContent = item.team.name;
+        document.getElementById('ceremony-challenge-score').textContent = item.challengeScore;
+        document.getElementById('ceremony-final-score').textContent = item.finalScore;
+        document.getElementById('ceremony-total-score').textContent = item.total;
+
+        if (item.rank === 1) {
+          card.className = 'w-full bg-gradient-to-b from-amber-950/70 via-slate-900 to-slate-900 border-4 border-yellow-400 rounded-3xl p-8 sm:p-12 shadow-2xl shadow-yellow-500/20 relative overflow-hidden transition-all duration-700';
+        } else if (item.rank === 2) {
+          card.className = 'w-full bg-gradient-to-b from-slate-800 via-slate-900 to-slate-900 border-4 border-slate-300 rounded-3xl p-8 sm:p-12 shadow-2xl shadow-slate-300/20 relative overflow-hidden transition-all duration-700';
+        } else if (item.rank === 3) {
+          card.className = 'w-full bg-gradient-to-b from-orange-950/60 via-slate-900 to-slate-900 border-4 border-orange-400 rounded-3xl p-8 sm:p-12 shadow-2xl shadow-orange-500/20 relative overflow-hidden transition-all duration-700';
+        } else {
+          card.className = 'w-full bg-slate-900 border-2 border-blue-500/60 rounded-3xl p-8 sm:p-12 shadow-2xl relative overflow-hidden transition-all duration-700';
+        }
+
+        actionBtn.textContent = '次の順位へ';
+        actionBtn.className = 'px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-black text-lg rounded-xl shadow-xl transition transform active:scale-95';
+      }
+    }
+
+    function triggerCeremonyAction() {
+      if (appState.ceremonyStepIndex >= ceremonyRankingList.length) {
+        appState.ceremonyStepIndex = 0;
+        appState.ceremonyRevealed = false;
+        updateCeremonyDisplay();
+        return;
+      }
+
+      if (!appState.ceremonyRevealed) {
+        // ドラムロール音＆オープン
+        playDrumrollSound(() => {
+          appState.ceremonyRevealed = true;
+          updateCeremonyDisplay();
+          const item = ceremonyRankingList[appState.ceremonyStepIndex];
+          if (item.rank <= 3) {
+            triggerConfetti();
+            playFanfareSound();
+          } else {
+            playCheerSound();
+          }
+        });
+      } else {
+        // 次へ進む
+        appState.ceremonyStepIndex++;
+        appState.ceremonyRevealed = false;
+        updateCeremonyDisplay();
+      }
+    }
+
+    function prevCeremonyStep() {
+      if (appState.ceremonyStepIndex > 0) {
+        appState.ceremonyStepIndex--;
+        appState.ceremonyRevealed = true;
+        updateCeremonyDisplay();
+      }
+    }
+
+    function nextCeremonyStep() {
+      if (appState.ceremonyStepIndex < ceremonyRankingList.length - 1) {
+        appState.ceremonyStepIndex++;
+        appState.ceremonyRevealed = false;
+        updateCeremonyDisplay();
+      }
+    }
+
+    // Web Audio API によるシンセサイズ音（外部mp3不要）
+    let audioCtx = null;
+    function getAudioContext() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      return audioCtx;
+    }
+
+    function playDrumrollSound(callback) {
+      try {
+        const ctx = getAudioContext();
+        const duration = 1.2;
+        const count = 24;
+        for (let i = 0; i < count; i++) {
+          const t = ctx.currentTime + (i * (duration / count));
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(90 + Math.random() * 40, t);
+          gain.gain.setValueAtTime(0.2, t);
+          gain.gain.exponentialRampToValueAtTime(0.01, t + 0.04);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(t);
+          osc.stop(t + 0.05);
+        }
+        setTimeout(callback, 1200);
+      } catch (e) {
+        setTimeout(callback, 500);
+      }
+    }
+
+    function playCheerSound() {
+      try {
+        const ctx = getAudioContext();
+        const chords = [523.25, 659.25, 783.99]; // C E G
+        chords.forEach(freq => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, ctx.currentTime);
+          gain.gain.setValueAtTime(0.15, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.8);
+        });
+      } catch (e) {}
+    }
+
+    function playFanfareSound() {
+      try {
+        const ctx = getAudioContext();
+        const notes = [
+          { f: 523.25, d: 0.15, wait: 0 },
+          { f: 659.25, d: 0.15, wait: 0.15 },
+          { f: 783.99, d: 0.15, wait: 0.3 },
+          { f: 1046.50, d: 0.7, wait: 0.45 },
+        ];
+        notes.forEach(n => {
+          const t = ctx.currentTime + n.wait;
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(n.f, t);
+          gain.gain.setValueAtTime(0.3, t);
+          gain.gain.exponentialRampToValueAtTime(0.01, t + n.d);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(t);
+          osc.stop(t + n.d);
+        });
+      } catch (e) {}
+    }
+
+    // 紙吹雪アニメーション
+    function triggerConfetti() {
+      if (typeof confetti === 'function') {
+        confetti({
+          particleCount: 100,
+          spread: 70,
+          origin: { y: 0.6 }
+        });
+      }
+    }
+
+    function triggerGrandConfetti() {
+      if (typeof confetti === 'function') {
+        const end = Date.now() + 3000;
+        const colors = ['#f59e0b', '#3b82f6', '#ec4899', '#10b981'];
+        (function frame() {
+          confetti({
+            particleCount: 4,
+            angle: 60,
+            spread: 55,
+            origin: { x: 0 },
+            colors: colors
+          });
+          confetti({
+            particleCount: 4,
+            angle: 120,
+            spread: 55,
+            origin: { x: 1 },
+            colors: colors
+          });
+          if (Date.now() < end) {
+            requestAnimationFrame(frame);
+          }
+        }());
+      }
+    }
+
+    // 全画面切り替え
+    function toggleFullScreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+          alert(`全画面表示エラー: ${err.message}`);
+        });
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        }
+      }
+    }
+
+    // 印刷プレビューの生成
+    function renderPrintPreview() {
+      const mode = document.getElementById('print-mode-select').value;
+      const previewArea = document.getElementById('print-preview-area');
+      const printSheetContainer = document.getElementById('print-sheet-container');
+
+      let html = '';
+      if (mode === 'all-sheets') {
+        html = appState.teams.map(team => generatePrintScoreSheetHtml(team)).join('<div class="page-break my-8 border-b-2 border-dashed border-slate-300"></div>');
+      } else if (mode === 'single-sheet') {
+        const team = appState.teams.find(t => t.id === appState.selectedTeamId) || appState.teams[0];
+        html = generatePrintScoreSheetHtml(team);
+      } else if (mode === 'blank-sheet') {
+        html = generatePrintScoreSheetHtml(null, true);
+      } else if (mode === 'ranking-report') {
+        html = generatePrintRankingReportHtml();
+      }
+
+      previewArea.innerHTML = html;
+      printSheetContainer.innerHTML = html;
+    }
+
+    // 原本デザイン再現の得点表A4横HTML生成
+    function generatePrintScoreSheetHtml(team, isBlank = false) {
+      const teamName = isBlank ? '＿＿＿＿＿＿＿＿＿＿＿＿' : (team ? escapeHtml(team.name) : '');
+      const scores = (!isBlank && team) ? team.scores : {};
+      const challengeTotal = (!isBlank && team) ? calcTeamChallengeScore(team) : '';
+      const finalRank = (!isBlank && team && team.finalRank) ? `${team.finalRank}位` : '';
+      const finalScore = (!isBlank && team && team.finalScore) ? `${team.finalScore}点` : '';
+      const totalScore = (!isBlank && team) ? `${calcTeamTotal(team)}点` : '';
+
+      return `
+        <div class="print-score-sheet bg-white p-4 max-w-5xl mx-auto border-2 border-slate-800 text-slate-900 leading-tight">
+          <!-- ヘッダー -->
+          <div class="bg-[#1a4a75] text-white py-2 text-center text-xl font-bold tracking-wider mb-2">
+            古田土会計チャレンジプログラム　得点表
+          </div>
+
+          <!-- チーム名記入欄 -->
+          <div class="flex items-stretch border border-slate-800 mb-2">
+            <div class="bg-slate-200 px-6 py-2 font-bold text-center border-r border-slate-800 w-40 flex items-center justify-center">
+              チーム名
+            </div>
+            <div class="px-6 py-2 font-black text-xl flex-1 flex items-center">
+              ${teamName}
+            </div>
+          </div>
+
+          <!-- 注意書き -->
+          <div class="text-right text-xs font-bold text-slate-800 mb-1">
+            １４時４０分までチャレンジタイム！<br>
+            <span class="text-slate-700">※ それぞれ色のチャレンジ種目を必ず１つ以上チャレンジしてください</span>
+          </div>
+
+          <!-- 種目テーブル -->
+          <table class="w-full border-collapse border border-slate-800 text-xs mb-3">
+            <thead>
+              <tr class="bg-slate-100 text-center font-bold">
+                <th class="border border-slate-800 p-1.5 w-10">No.</th>
+                <th class="border border-slate-800 p-1.5 w-44">チャレンジ種目</th>
+                <th class="border border-slate-800 p-1.5">種目内容</th>
+                <th class="border border-slate-800 p-1.5 w-20">所要時間</th>
+                <th class="border border-slate-800 p-1.5 w-14">最大点</th>
+                <th class="border border-slate-800 p-1.5 w-16">得点</th>
+                <th class="border border-slate-800 p-1.5 w-28">担当スタッフ サイン</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- 1: 水色 -->
+              <tr class="bg-[#e0f2fe]/70">
+                <td class="border border-slate-800 text-center font-bold">1</td>
+                <td class="border border-slate-800 p-1.5 font-bold">じゃんけんチャレンジ</td>
+                <td class="border border-slate-800 p-1.5">スタッフと順番にじゃんけん！<br>スタッフ1人につき1回チャレンジ（何人でも可）<br>＜最高連続勝利数×3点＞</td>
+                <td class="border border-slate-800 text-center">-</td>
+                <td class="border border-slate-800 text-center font-bold">30</td>
+                <td class="border border-slate-800 text-center font-black text-base text-blue-900">${scores[1] ?? ''}</td>
+                <td class="border border-slate-800"></td>
+              </tr>
+              <!-- 2: 水色 -->
+              <tr class="bg-[#e0f2fe]/70">
+                <td class="border border-slate-800 text-center font-bold">2</td>
+                <td class="border border-slate-800 p-1.5 font-bold">割り箸切りチャレンジ</td>
+                <td class="border border-slate-800 p-1.5">カードで割り箸切り！<br>＜成功本数×3点＞</td>
+                <td class="border border-slate-800 text-center">約10分</td>
+                <td class="border border-slate-800 text-center font-bold">30</td>
+                <td class="border border-slate-800 text-center font-black text-base text-blue-900">${scores[2] ?? ''}</td>
+                <td class="border border-slate-800"></td>
+              </tr>
+              <!-- 3: 水色 -->
+              <tr class="bg-[#e0f2fe]/70">
+                <td class="border border-slate-800 text-center font-bold">3</td>
+                <td class="border border-slate-800 p-1.5 font-bold">ピクチャーコミュニケーション</td>
+                <td class="border border-slate-800 p-1.5">絵だけでお題を伝えよう！<br>＜優しい問題1点〜難しい問題3点までの計20問＞</td>
+                <td class="border border-slate-800 text-center">約15分</td>
+                <td class="border border-slate-800 text-center font-bold">30</td>
+                <td class="border border-slate-800 text-center font-black text-base text-blue-900">${scores[3] ?? ''}</td>
+                <td class="border border-slate-800"></td>
+              </tr>
+              <!-- 4: 黄色 -->
+              <tr class="bg-[#fef9c3]/70">
+                <td class="border border-slate-800 text-center font-bold">4</td>
+                <td class="border border-slate-800 p-1.5 font-bold">ヘリウムリング</td>
+                <td class="border border-slate-800 p-1.5">息を合わせ、フープを下まで降ろそう！<br>＜チャレンジ10点、惜しい20点、達成30点＞</td>
+                <td class="border border-slate-800 text-center">約20分</td>
+                <td class="border border-slate-800 text-center font-bold">30</td>
+                <td class="border border-slate-800 text-center font-black text-base text-yellow-900">${scores[4] ?? ''}</td>
+                <td class="border border-slate-800"></td>
+              </tr>
+              <!-- 5: 黄色 -->
+              <tr class="bg-[#fef9c3]/70">
+                <td class="border border-slate-800 text-center font-bold">5</td>
+                <td class="border border-slate-800 p-1.5 font-bold">トラフィックジャム</td>
+                <td class="border border-slate-800 p-1.5">左右の位置を完全に入れ替えよう！<br>＜チャレンジ10点、惜しい20点、達成30点＞</td>
+                <td class="border border-slate-800 text-center">約20分</td>
+                <td class="border border-slate-800 text-center font-bold">30</td>
+                <td class="border border-slate-800 text-center font-black text-base text-yellow-900">${scores[5] ?? ''}</td>
+                <td class="border border-slate-800"></td>
+              </tr>
+              <!-- 6: 黄色 -->
+              <tr class="bg-[#fef9c3]/70">
+                <td class="border border-slate-800 text-center font-bold">6</td>
+                <td class="border border-slate-800 p-1.5 font-bold">Aフレーム</td>
+                <td class="border border-slate-800 p-1.5">板の上から落ちずに、全員で位置を入れ替えよう！<br>＜チャレンジ10点、惜しい20点、達成30点＞</td>
+                <td class="border border-slate-800 text-center">約20分</td>
+                <td class="border border-slate-800 text-center font-bold">30</td>
+                <td class="border border-slate-800 text-center font-black text-base text-yellow-900">${scores[6] ?? ''}</td>
+                <td class="border border-slate-800"></td>
+              </tr>
+              <!-- 7: 赤色 -->
+              <tr class="bg-[#fee2e2]/70">
+                <td class="border border-slate-800 text-center font-bold">7</td>
+                <td class="border border-slate-800 p-1.5 font-bold">スーパー神経衰弱</td>
+                <td class="border border-slate-800 p-1.5">時間内に26ペアに挑戦！<br>＜1ペア1点、全26ペア完成でボーナス点加算＞</td>
+                <td class="border border-slate-800 text-center">約30分</td>
+                <td class="border border-slate-800 text-center font-bold">30</td>
+                <td class="border border-slate-800 text-center font-black text-base text-rose-900">${scores[7] ?? ''}</td>
+                <td class="border border-slate-800"></td>
+              </tr>
+              <!-- 8: 赤色 -->
+              <tr class="bg-[#fee2e2]/70">
+                <td class="border border-slate-800 text-center font-bold">8</td>
+                <td class="border border-slate-800 p-1.5 font-bold">パイプライン</td>
+                <td class="border border-slate-800 p-1.5">10個のボールをパイプでゴールへ！<br>＜成功数×3点＞</td>
+                <td class="border border-slate-800 text-center">約30分</td>
+                <td class="border border-slate-800 text-center font-bold">30</td>
+                <td class="border border-slate-800 text-center font-black text-base text-rose-900">${scores[8] ?? ''}</td>
+                <td class="border border-slate-800"></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- 集合アナウンス -->
+          <div class="text-center font-bold text-xs text-slate-800 my-1">
+            １４時４５分　それぞれのチームで円になって集まってください。
+          </div>
+
+          <!-- 最終チャレンジ枠 -->
+          <div class="border border-slate-800 mb-2">
+            <div class="bg-slate-100 text-center font-bold py-1 border-b border-slate-800 text-xs">
+              最終チャレンジ　１４時４５分開始予定
+            </div>
+            <div class="flex items-center text-xs">
+              <div class="w-16 p-2 font-bold text-center border-r border-slate-800 bg-slate-50">順位</div>
+              <div class="flex-1 p-2 font-bold text-center">
+                1位60点　2位50点　3位45点　4位40点　5位35点　6位30点　7位25点　8位20点　9位15点
+              </div>
+            </div>
+          </div>
+
+          <!-- 最終得点・合計得点 -->
+          <table class="w-full border-collapse border border-slate-800 text-xs">
+            <tr>
+              <th class="border border-slate-800 p-2 bg-slate-100 font-bold w-48 text-center">最終チャレンジ得点</th>
+              <td class="border border-slate-800 p-2 text-center font-black text-lg text-purple-900">${finalScore}</td>
+            </tr>
+            <tr class="bg-slate-50">
+              <th class="border border-slate-800 p-2 bg-slate-200 font-black text-sm text-center">合計得点</th>
+              <td class="border border-slate-800 p-2 text-center font-black text-2xl text-blue-950">${totalScore}</td>
+            </tr>
+          </table>
+
+          <div class="text-[10px] text-slate-500 mt-2">
+            ※ 各種目の詳しいルールは担当スタッフが説明します。
+          </div>
+        </div>
+      `;
+    }
+
+    // 総合結果ランキングレポート（A4縦向け）
+    function generatePrintRankingReportHtml() {
+      const rankings = calculateRankings();
+      const trs = rankings.map(item => `
+        <tr class="border-b border-slate-300">
+          <td class="p-2 text-center font-black text-base">${item.rank}</td>
+          <td class="p-2 font-bold">${escapeHtml(item.team.name)}</td>
+          <td class="p-2 text-center text-xs">${item.colorStatus.blue ? '✓' : '-'}</td>
+          <td class="p-2 text-center text-xs">${item.colorStatus.yellow ? '✓' : '-'}</td>
+          <td class="p-2 text-center text-xs">${item.colorStatus.red ? '✓' : '-'}</td>
+          <td class="p-2 text-center text-xs font-bold">${item.colorStatus.allCompleted ? 'クリア' : '未達あり'}</td>
+          <td class="p-2 text-right font-bold">${item.challengeScore}点</td>
+          <td class="p-2 text-right font-bold text-purple-900">${item.finalScore}点 (${item.team.finalRank ? item.team.finalRank + '位' : '-'})</td>
+          <td class="p-2 text-right font-black text-lg text-blue-900">${item.total}点</td>
+        </tr>
+      `).join('');
+
+      return `
+        <div class="print-portrait bg-white p-6 max-w-4xl mx-auto border border-slate-800 text-slate-900">
+          <div class="text-center pb-4 mb-4 border-b-2 border-slate-800">
+            <h2 class="text-2xl font-black">古田土会計チャレンジプログラム 総合結果一覧</h2>
+            <p class="text-xs text-slate-500 mt-1">印刷日時: ${new Date().toLocaleString('ja-JP')} / 参加チーム数: ${appState.teams.length}</p>
+          </div>
+
+          <table class="w-full text-left border-collapse text-xs mb-6">
+            <thead>
+              <tr class="bg-slate-900 text-white font-bold text-center">
+                <th class="p-2 w-12">順位</th>
+                <th class="p-2 text-left">チーム名</th>
+                <th class="p-2 w-14">水色</th>
+                <th class="p-2 w-14">黄色</th>
+                <th class="p-2 w-14">赤色</th>
+                <th class="p-2 w-20">全色達成</th>
+                <th class="p-2 w-20 text-right">種目小計</th>
+                <th class="p-2 w-28 text-right">最終チャレ</th>
+                <th class="p-2 w-24 text-right">総合計</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${trs}
+            </tbody>
+          </table>
+
+          <div class="bg-slate-50 border border-slate-300 p-3 rounded text-xs space-y-1">
+            <div class="font-bold">【集計ルール注記】</div>
+            <div>・各種目最大得点: 30点 × 8種目 = 最大240点</div>
+            <div>・最終チャレンジ配点: 1位60点, 2位50点, 3位45点, 4位40点, 5位35点, 6位30点, 7位25点, 8位20点, 9位15点</div>
+            <div>・必須条件: 水色（No.1〜3）、黄色（No.4〜6）、赤色（No.7〜8）の各色で1種目以上チャレンジ</div>
+          </div>
+        </div>
+      `;
+    }
+
+    // 設定画面：チームリスト管理の描画
+    function renderSettingsTeamList() {
+      const container = document.getElementById('settings-team-list');
+      container.innerHTML = '';
+
+      appState.teams.forEach((team, idx) => {
+        const div = document.createElement('div');
+        div.className = 'flex items-center gap-2 p-2.5 bg-slate-50 border border-slate-200 rounded-lg';
+        div.innerHTML = `
+          <span class="text-xs font-bold text-slate-400 w-6">${idx + 1}.</span>
+          <input type="text" value="${escapeHtml(team.name)}" onchange="updateTeamNameDirect(${team.id}, this.value)" 
+            class="flex-1 text-xs font-bold border border-slate-300 rounded px-2 py-1 bg-white focus:ring-1 focus:ring-blue-500">
+          <button onclick="removeTeam(${team.id})" class="text-slate-400 hover:text-rose-600 p-1 text-xs transition" title="チームを削除">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function updateTeamNameDirect(id, newName) {
+      const team = appState.teams.find(t => t.id === id);
+      if (!team) return;
+      team.name = newName.trim() || `チーム ${id}`;
+      saveData();
+      renderAll();
+    }
+
+    function addNewTeam() {
+      const nextId = appState.teams.length > 0 ? Math.max(...appState.teams.map(t => t.id)) + 1 : 1;
+      appState.teams.push({
+        id: nextId,
+        name: `チーム ${nextId}`,
+        scores: { 1: null, 2: null, 3: null, 4: null, 5: null, 6: null, 7: null, 8: null },
+        finalRank: null,
+        finalScore: 0
+      });
+      saveData();
+      renderAll();
+    }
+
+    function removeTeam(id) {
+      if (appState.teams.length <= 1) {
+        alert('チームは最低1つ必要です。');
+        return;
+      }
+      if (!confirm('このチームを削除してもよろしいですか？入力された得点データも削除されます。')) {
+        return;
+      }
+      appState.teams = appState.teams.filter(t => t.id !== id);
+      if (appState.selectedTeamId === id) {
+        appState.selectedTeamId = appState.teams[0].id;
+      }
+      saveData();
+      renderAll();
+    }
+
+    // 最終チャレンジ配点マスタ表示
+    function renderFinalPointsRuleDisplay() {
+      const container = document.getElementById('final-points-rule-display');
+      container.innerHTML = '';
+      for (let r = 1; r <= 9; r++) {
+        const pts = FINAL_POINTS_TABLE[r] || 0;
+        const box = document.createElement('div');
+        box.className = 'bg-purple-50 border border-purple-200 rounded p-2 text-purple-900';
+        box.innerHTML = `
+          <div class="font-bold text-[11px]">${r}位</div>
+          <div class="score-font text-xl font-black text-purple-700">${pts}点</div>
+        `;
+        container.appendChild(box);
+      }
+    }
+
+    // 最終順位一括設定モーダル
+    function openFinalRankModal() {
+      const modal = document.getElementById('final-rank-modal');
+      const list = document.getElementById('modal-rank-assign-list');
+      list.innerHTML = '';
+
+      for (let r = 1; r <= appState.teams.length; r++) {
+        const pts = FINAL_POINTS_TABLE[r] !== undefined ? FINAL_POINTS_TABLE[r] : 10;
+        const currentAssigned = appState.teams.find(t => t.finalRank === r);
+
+        const row = document.createElement('div');
+        row.className = 'flex items-center justify-between gap-3 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs';
+        
+        let options = '<option value="">-- 未割り当て --</option>';
+        appState.teams.forEach(t => {
+          const selected = (currentAssigned && currentAssigned.id === t.id) ? 'selected' : '';
+          options += `<option value="${t.id}" ${selected}>${escapeHtml(t.name)}</option>`;
+        });
+
+        row.innerHTML = `
+          <div class="w-24 font-bold flex items-center gap-1 text-purple-900">
+            <span class="w-6 h-6 rounded bg-purple-600 text-white flex items-center justify-center font-bold text-xs">${r}位</span>
+            <span class="score-font text-base text-purple-700">(${pts}点)</span>
+          </div>
+          <select id="modal-select-rank-${r}" class="flex-1 border border-slate-300 rounded p-1.5 bg-white font-bold">
+            ${options}
+          </select>
+        `;
+        list.appendChild(row);
+      }
+
+      modal.classList.remove('hidden');
+    }
+
+    function closeFinalRankModal() {
+      document.getElementById('final-rank-modal').classList.add('hidden');
+    }
+
+    function saveBatchFinalRanks() {
+      // 一旦全チームの最終順位をクリア
+      appState.teams.forEach(t => {
+        t.finalRank = null;
+        t.finalScore = 0;
+      });
+
+      for (let r = 1; r <= appState.teams.length; r++) {
+        const select = document.getElementById(`modal-select-rank-${r}`);
+        if (select && select.value) {
+          const teamId = parseInt(select.value, 10);
+          const team = appState.teams.find(t => t.id === teamId);
+          if (team) {
+            team.finalRank = r;
+            team.finalScore = FINAL_POINTS_TABLE[r] !== undefined ? FINAL_POINTS_TABLE[r] : 10;
+          }
+        }
+      }
+
+      saveData();
+      renderAll();
+      closeFinalRankModal();
+    }
+
+    // JSONエクスポート
+    function exportDataJson() {
+      const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(appState, null, 2));
+      const a = document.createElement('a');
+      a.setAttribute('href', dataStr);
+      a.setAttribute('download', `古田土会計チャレンジ_得点データ_${new Date().toISOString().slice(0,10)}.json`);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
+
+    // JSONインポート
+    function importDataJson(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const parsed = JSON.parse(event.target.result);
+          if (parsed && Array.isArray(parsed.teams)) {
+            appState.teams = parsed.teams;
+            appState.selectedTeamId = parsed.selectedTeamId || appState.teams[0].id;
+            saveData();
+            renderAll();
+            alert('データを正常にインポートしました。');
+          } else {
+            alert('無効なデータ形式です。');
+          }
+        } catch (err) {
+          alert('JSONの読み込みに失敗しました: ' + err.message);
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // 得点のみ初期化
+    function resetAllScoresOnly() {
+      if (!confirm('すべての得点と順位をリセットしますか？（チーム名は維持されます）')) return;
+      appState.teams.forEach(t => {
+        t.scores = { 1: null, 2: null, 3: null, 4: null, 5: null, 6: null, 7: null, 8: null };
+        t.finalRank = null;
+        t.finalScore = 0;
+      });
+      saveData();
+      renderAll();
+      alert('得点をクリアしました。');
+    }
+
+    // 工場出荷時リセット
+    function resetAllDataFactory() {
+      if (!confirm('システムを初期状態に戻しますか？すべてのデータが削除されます。')) return;
+      localStorage.removeItem(STORAGE_KEY);
+      appState.teams = createInitialTeams();
+      appState.selectedTeamId = 1;
+      saveData();
+      renderAll();
+      alert('初期化が完了しました。');
+    }
+
+    // サンプルデータの自動投入
+    function quickFillSampleData() {
+      if (!confirm('テスト用のサンプル得点を各チームに自動入力しますか？（現在の得点は上書きされます）')) return;
+      
+      const sampleNames = [
+        'チームA (情熱)', 'チームB (挑戦)', 'チームC (躍進)',
+        'チームD (団結)', 'チームE (未来)', 'チームF (勝利)',
+        'チームG (絆)', 'チームH (希望)', 'チームI (笑顔)'
+      ];
+
+      // 9チーム分のリアルなスコアと順位
+      const samplePresets = [
+        { scores: {1: 27, 2: 24, 3: 25, 4: 30, 5: 30, 6: 20, 7: 30, 8: 27}, rank: 1 },
+        { scores: {1: 24, 2: 21, 3: 22, 4: 30, 5: 20, 6: 30, 7: 28, 8: 24}, rank: 2 },
+        { scores: {1: 21, 2: 27, 3: 20, 4: 20, 5: 30, 6: 20, 7: 26, 8: 21}, rank: 3 },
+        { scores: {1: 18, 2: 18, 3: 23, 4: 20, 5: 20, 6: 30, 7: 22, 8: 24}, rank: 4 },
+        { scores: {1: 15, 2: 15, 3: 18, 4: 30, 5: 20, 6: 20, 7: 20, 8: 18}, rank: 5 },
+        { scores: {1: 18, 2: 12, 3: 15, 4: 20, 5: 20, 6: 20, 7: 18, 8: 15}, rank: 6 },
+        { scores: {1: 12, 2: 15, 3: 16, 4: 10, 5: 20, 6: 10, 7: 16, 8: 18}, rank: 7 },
+        { scores: {1: 9,  2: 12, 3: 14, 4: 10, 5: 10, 6: 20, 7: 15, 8: 12}, rank: 8 },
+        { scores: {1: 6,  2: 9,  3: 12, 4: 10, 5: 10, 6: 10, 7: 12, 8: 9},  rank: 9 },
+      ];
+
+      appState.teams.forEach((t, i) => {
+        if (sampleNames[i]) t.name = sampleNames[i];
+        const p = samplePresets[i] || samplePresets[0];
+        t.scores = { ...p.scores };
+        t.finalRank = p.rank;
+        t.finalScore = FINAL_POINTS_TABLE[p.rank] || 15;
+      });
+
+      saveData();
+      renderAll();
+      alert('サンプルデータを投入しました！順位表やプロジェクター画面で動作をご確認ください。');
+    }
+
+    // タブ切り替え
+    function switchTab(tabId) {
+      appState.currentTab = tabId;
+      const tabs = ['input', 'ranking', 'projector', 'print', 'settings'];
+      tabs.forEach(t => {
+        const sec = document.getElementById(`tab-${t}`);
+        const btn = document.getElementById(`nav-btn-${t}`);
+        if (t === tabId) {
+          sec.classList.remove('hidden');
+          btn.className = 'nav-tab px-3.5 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 bg-blue-600 text-white shadow';
+        } else {
+          sec.classList.add('hidden');
+          btn.className = 'nav-tab px-3.5 py-2 rounded-lg text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center gap-2';
+        }
+      });
+
+      if (tabId === 'print') {
+        renderPrintPreview();
+      }
+    }
+
+    // キーボードショートカット
+    function setupKeyboardListeners() {
+      window.addEventListener('keydown', (e) => {
+        // セレモニーモード時の操作
+        const ceremonyOverlay = document.getElementById('ceremony-overlay');
+        if (ceremonyOverlay && !ceremonyOverlay.classList.contains('hidden')) {
+          if (e.code === 'Space' || e.code === 'Enter') {
+            e.preventDefault();
+            triggerCeremonyAction();
+          } else if (e.code === 'ArrowRight') {
+            e.preventDefault();
+            nextCeremonyStep();
+          } else if (e.code === 'ArrowLeft') {
+            e.preventDefault();
+            prevCeremonyStep();
+          } else if (e.code === 'Escape') {
+            exitCeremonyMode();
+          }
+        }
+      });
+    }
+
+    // HTMLエスケープヘルパー
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+  </script>
+</body>
+</html>

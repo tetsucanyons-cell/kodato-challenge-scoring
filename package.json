@@ -1,0 +1,12 @@
+{
+  "name": "kodato-accounting-challenge-scoring",
+  "version": "1.0.0",
+  "description": "古田土会計チャレンジプログラム 得点集計・プロジェクター投影システム",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx serve ."
+  },
+  "keywords": ["scoring", "event", "presentation"],
+  "author": "tetsu",
+  "license": "MIT"
+}
